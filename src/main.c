@@ -1,3 +1,4 @@
+#define SDL_MAIN_HANDLED
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -28,6 +29,7 @@ int main(int argc, char *argv[]) {
     }
 
     // 2. Initialize SDL2
+    SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         fprintf(stderr, "Failed to initialize SDL: %s\n", SDL_GetError());
         db_close();
