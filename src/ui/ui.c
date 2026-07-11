@@ -147,42 +147,110 @@ static void load_tab_data(SidebarMenu menu) {
     }
 }
 
-// Custom UI theme setup
-static void set_dark_theme(struct nk_context *ctx) {
+// Theme variables
+static bool g_light_mode = false;
+static struct nk_color g_theme_text_header;
+static struct nk_color g_theme_text_muted;
+static struct nk_color g_theme_border;
+
+static void set_material_dark_theme(struct nk_context *ctx) {
     struct nk_color table[NK_COLOR_COUNT];
-    table[NK_COLOR_TEXT] = nk_rgba(230, 235, 245, 255);
-    table[NK_COLOR_WINDOW] = nk_rgba(20, 24, 33, 255);
-    table[NK_COLOR_HEADER] = nk_rgba(30, 36, 48, 255);
-    table[NK_COLOR_BORDER] = nk_rgba(45, 54, 72, 255);
-    table[NK_COLOR_BUTTON] = nk_rgba(31, 38, 51, 255);
-    table[NK_COLOR_BUTTON_HOVER] = nk_rgba(62, 141, 240, 255);
-    table[NK_COLOR_BUTTON_ACTIVE] = nk_rgba(43, 108, 176, 255);
-    table[NK_COLOR_TOGGLE] = nk_rgba(31, 38, 51, 255);
-    table[NK_COLOR_TOGGLE_HOVER] = nk_rgba(62, 141, 240, 255);
-    table[NK_COLOR_TOGGLE_CURSOR] = nk_rgba(62, 141, 240, 255);
-    table[NK_COLOR_SELECT] = nk_rgba(45, 54, 72, 255);
-    table[NK_COLOR_SELECT_ACTIVE] = nk_rgba(62, 141, 240, 255);
-    table[NK_COLOR_SLIDER] = nk_rgba(31, 38, 51, 255);
-    table[NK_COLOR_SLIDER_CURSOR] = nk_rgba(62, 141, 240, 255);
-    table[NK_COLOR_SLIDER_CURSOR_HOVER] = nk_rgba(80, 160, 250, 255);
-    table[NK_COLOR_SLIDER_CURSOR_ACTIVE] = nk_rgba(43, 108, 176, 255);
-    table[NK_COLOR_PROPERTY] = nk_rgba(31, 38, 51, 255);
-    table[NK_COLOR_EDIT] = nk_rgba(30, 36, 48, 255);
-    table[NK_COLOR_EDIT_CURSOR] = nk_rgba(230, 235, 245, 255);
-    table[NK_COLOR_COMBO] = nk_rgba(31, 38, 51, 255);
-    table[NK_COLOR_CHART] = nk_rgba(31, 38, 51, 255);
-    table[NK_COLOR_CHART_COLOR] = nk_rgba(62, 141, 240, 255);
-    table[NK_COLOR_CHART_COLOR_HIGHLIGHT] = nk_rgba(255, 0, 0, 255);
-    table[NK_COLOR_SCROLLBAR] = nk_rgba(20, 24, 33, 255);
-    table[NK_COLOR_SCROLLBAR_CURSOR] = nk_rgba(45, 54, 72, 255);
-    table[NK_COLOR_SCROLLBAR_CURSOR_HOVER] = nk_rgba(62, 141, 240, 255);
-    table[NK_COLOR_SCROLLBAR_CURSOR_ACTIVE] = nk_rgba(43, 108, 176, 255);
-    table[NK_COLOR_TAB_HEADER] = nk_rgba(30, 36, 48, 255);
+    table[NK_COLOR_TEXT] = nk_rgba(240, 240, 240, 255);
+    table[NK_COLOR_WINDOW] = nk_rgba(18, 18, 18, 255);
+    table[NK_COLOR_HEADER] = nk_rgba(30, 30, 30, 255);
+    table[NK_COLOR_BORDER] = nk_rgba(40, 40, 40, 255);
+    table[NK_COLOR_BUTTON] = nk_rgba(30, 136, 229, 255);
+    table[NK_COLOR_BUTTON_HOVER] = nk_rgba(33, 150, 243, 255);
+    table[NK_COLOR_BUTTON_ACTIVE] = nk_rgba(21, 101, 192, 255);
+    table[NK_COLOR_TOGGLE] = nk_rgba(45, 45, 45, 255);
+    table[NK_COLOR_TOGGLE_HOVER] = nk_rgba(33, 150, 243, 255);
+    table[NK_COLOR_TOGGLE_CURSOR] = nk_rgba(33, 150, 243, 255);
+    table[NK_COLOR_SELECT] = nk_rgba(45, 45, 45, 255);
+    table[NK_COLOR_SELECT_ACTIVE] = nk_rgba(33, 150, 243, 255);
+    table[NK_COLOR_SLIDER] = nk_rgba(45, 45, 45, 255);
+    table[NK_COLOR_SLIDER_CURSOR] = nk_rgba(33, 150, 243, 255);
+    table[NK_COLOR_SLIDER_CURSOR_HOVER] = nk_rgba(100, 181, 246, 255);
+    table[NK_COLOR_SLIDER_CURSOR_ACTIVE] = nk_rgba(21, 101, 192, 255);
+    table[NK_COLOR_PROPERTY] = nk_rgba(30, 30, 30, 255);
+    table[NK_COLOR_EDIT] = nk_rgba(30, 30, 30, 255);
+    table[NK_COLOR_EDIT_CURSOR] = nk_rgba(240, 240, 240, 255);
+    table[NK_COLOR_COMBO] = nk_rgba(30, 30, 30, 255);
+    table[NK_COLOR_CHART] = nk_rgba(30, 30, 30, 255);
+    table[NK_COLOR_CHART_COLOR] = nk_rgba(33, 150, 243, 255);
+    table[NK_COLOR_CHART_COLOR_HIGHLIGHT] = nk_rgba(233, 30, 99, 255);
+    table[NK_COLOR_SCROLLBAR] = nk_rgba(18, 18, 18, 255);
+    table[NK_COLOR_SCROLLBAR_CURSOR] = nk_rgba(50, 50, 50, 255);
+    table[NK_COLOR_SCROLLBAR_CURSOR_HOVER] = nk_rgba(70, 70, 70, 255);
+    table[NK_COLOR_SCROLLBAR_CURSOR_ACTIVE] = nk_rgba(33, 150, 243, 255);
+    table[NK_COLOR_TAB_HEADER] = nk_rgba(30, 30, 30, 255);
     nk_style_from_table(ctx, table);
+    
+    ctx->style.window.rounding = 8.0f;
+    ctx->style.button.rounding = 4.0f;
+    ctx->style.edit.rounding = 4.0f;
+    ctx->style.property.rounding = 4.0f;
+    ctx->style.combo.rounding = 4.0f;
+    ctx->style.tab.rounding = 4.0f;
+    ctx->style.window.header.align = NK_HEADER_LEFT;
+}
+
+static void set_material_light_theme(struct nk_context *ctx) {
+    struct nk_color table[NK_COLOR_COUNT];
+    table[NK_COLOR_TEXT] = nk_rgba(33, 33, 33, 255);
+    table[NK_COLOR_WINDOW] = nk_rgba(245, 245, 247, 255);
+    table[NK_COLOR_HEADER] = nk_rgba(255, 255, 255, 255);
+    table[NK_COLOR_BORDER] = nk_rgba(224, 224, 224, 255);
+    table[NK_COLOR_BUTTON] = nk_rgba(63, 81, 181, 255);
+    table[NK_COLOR_BUTTON_HOVER] = nk_rgba(92, 107, 192, 255);
+    table[NK_COLOR_BUTTON_ACTIVE] = nk_rgba(48, 63, 159, 255);
+    table[NK_COLOR_TOGGLE] = nk_rgba(224, 224, 224, 255);
+    table[NK_COLOR_TOGGLE_HOVER] = nk_rgba(63, 81, 181, 255);
+    table[NK_COLOR_TOGGLE_CURSOR] = nk_rgba(63, 81, 181, 255);
+    table[NK_COLOR_SELECT] = nk_rgba(232, 234, 246, 255);
+    table[NK_COLOR_SELECT_ACTIVE] = nk_rgba(63, 81, 181, 255);
+    table[NK_COLOR_SLIDER] = nk_rgba(224, 224, 224, 255);
+    table[NK_COLOR_SLIDER_CURSOR] = nk_rgba(63, 81, 181, 255);
+    table[NK_COLOR_SLIDER_CURSOR_HOVER] = nk_rgba(92, 107, 192, 255);
+    table[NK_COLOR_SLIDER_CURSOR_ACTIVE] = nk_rgba(48, 63, 159, 255);
+    table[NK_COLOR_PROPERTY] = nk_rgba(255, 255, 255, 255);
+    table[NK_COLOR_EDIT] = nk_rgba(255, 255, 255, 255);
+    table[NK_COLOR_EDIT_CURSOR] = nk_rgba(33, 33, 33, 255);
+    table[NK_COLOR_COMBO] = nk_rgba(255, 255, 255, 255);
+    table[NK_COLOR_CHART] = nk_rgba(255, 255, 255, 255);
+    table[NK_COLOR_CHART_COLOR] = nk_rgba(63, 81, 181, 255);
+    table[NK_COLOR_CHART_COLOR_HIGHLIGHT] = nk_rgba(233, 30, 99, 255);
+    table[NK_COLOR_SCROLLBAR] = nk_rgba(240, 240, 240, 255);
+    table[NK_COLOR_SCROLLBAR_CURSOR] = nk_rgba(200, 200, 200, 255);
+    table[NK_COLOR_SCROLLBAR_CURSOR_HOVER] = nk_rgba(180, 180, 180, 255);
+    table[NK_COLOR_SCROLLBAR_CURSOR_ACTIVE] = nk_rgba(63, 81, 181, 255);
+    table[NK_COLOR_TAB_HEADER] = nk_rgba(240, 240, 240, 255);
+    nk_style_from_table(ctx, table);
+    
+    ctx->style.window.rounding = 8.0f;
+    ctx->style.button.rounding = 4.0f;
+    ctx->style.edit.rounding = 4.0f;
+    ctx->style.property.rounding = 4.0f;
+    ctx->style.combo.rounding = 4.0f;
+    ctx->style.tab.rounding = 4.0f;
+    ctx->style.window.header.align = NK_HEADER_LEFT;
+}
+
+static void ui_apply_theme(struct nk_context *ctx) {
+    if (g_light_mode) {
+        set_material_light_theme(ctx);
+        g_theme_text_header = nk_rgb(33, 33, 33);
+        g_theme_text_muted = nk_rgb(117, 117, 117);
+        g_theme_border = nk_rgb(224, 224, 224);
+    } else {
+        set_material_dark_theme(ctx);
+        g_theme_text_header = nk_rgb(255, 255, 255);
+        g_theme_text_muted = nk_rgb(160, 170, 185);
+        g_theme_border = nk_rgb(45, 54, 72);
+    }
 }
 
 void ui_init(struct nk_context *ctx) {
-    set_dark_theme(ctx);
+    ui_apply_theme(ctx);
     get_today_date(g_attendance_date, sizeof(g_attendance_date));
     load_tab_data(MENU_DASHBOARD);
 }
@@ -259,7 +327,7 @@ static void draw_sidebar(struct nk_context *ctx, int height) {
         nk_layout_row_dynamic(ctx, 35, 1);
         nk_label(ctx, " DANGERPCA ERP ", NK_TEXT_CENTERED);
         nk_layout_row_dynamic(ctx, 1, 1);
-        nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+        nk_rule_horizontal(ctx, g_theme_border, 1);
         nk_layout_row_dynamic(ctx, 10, 1); // Spacer
 
         const char *menus[] = {
@@ -275,12 +343,21 @@ static void draw_sidebar(struct nk_context *ctx, int height) {
 
         for (int i = 0; i < 10; i++) {
             if (g_current_menu == mapping[i]) {
-                // Highlight active button
-                ctx->style.button.normal.data.color = nk_rgb(62, 141, 240);
+                // Highlight active button (indigo in light mode, sky-blue in dark mode)
+                ctx->style.button.normal.data.color = g_light_mode ? nk_rgb(63, 81, 181) : nk_rgb(30, 136, 229);
+                ctx->style.button.hover.data.color = g_light_mode ? nk_rgb(92, 107, 192) : nk_rgb(33, 150, 243);
+                ctx->style.button.active.data.color = g_light_mode ? nk_rgb(48, 63, 159) : nk_rgb(21, 101, 192);
                 ctx->style.button.text_normal = nk_rgb(255, 255, 255);
+                ctx->style.button.text_hover = nk_rgb(255, 255, 255);
+                ctx->style.button.text_active = nk_rgb(255, 255, 255);
             } else {
-                ctx->style.button.normal.data.color = nk_rgb(31, 38, 51);
-                ctx->style.button.text_normal = nk_rgb(230, 235, 245);
+                // Inactive button (subtle background, clean text contrast)
+                ctx->style.button.normal.data.color = g_light_mode ? nk_rgb(235, 237, 240) : nk_rgb(30, 30, 30);
+                ctx->style.button.hover.data.color = g_light_mode ? nk_rgb(220, 222, 225) : nk_rgb(45, 45, 45);
+                ctx->style.button.active.data.color = g_light_mode ? nk_rgb(200, 202, 205) : nk_rgb(25, 25, 25);
+                ctx->style.button.text_normal = g_light_mode ? nk_rgb(33, 33, 33) : nk_rgb(200, 200, 200);
+                ctx->style.button.text_hover = g_light_mode ? nk_rgb(33, 33, 33) : nk_rgb(255, 255, 255);
+                ctx->style.button.text_active = g_light_mode ? nk_rgb(33, 33, 33) : nk_rgb(255, 255, 255);
             }
 
             if (nk_button_label(ctx, menus[i])) {
@@ -289,9 +366,8 @@ static void draw_sidebar(struct nk_context *ctx, int height) {
             }
         }
         
-        // Reset styles
-        ctx->style.button.normal.data.color = nk_rgb(31, 38, 51);
-        ctx->style.button.text_normal = nk_rgb(230, 235, 245);
+        // Reset style configurations back to default active theme
+        ui_apply_theme(ctx);
 
         nk_group_end(ctx);
     }
@@ -303,6 +379,7 @@ static void draw_topbar(struct nk_context *ctx) {
         nk_layout_row_template_begin(ctx, 30);
         nk_layout_row_template_push_static(ctx, 120); // Role tag
         nk_layout_row_template_push_dynamic(ctx);     // Welcome message
+        nk_layout_row_template_push_static(ctx, 130); // Theme Switcher Button
         nk_layout_row_template_push_static(ctx, 100); // Logout Button
         nk_layout_row_template_end(ctx);
 
@@ -312,11 +389,17 @@ static void draw_topbar(struct nk_context *ctx) {
 
         char role_tag[150];
         snprintf(role_tag, sizeof(role_tag), "[%s]", role_str);
-        nk_label_colored(ctx, role_tag, NK_TEXT_LEFT, nk_rgb(62, 141, 240));
+        nk_label_colored(ctx, role_tag, NK_TEXT_LEFT, g_light_mode ? nk_rgb(63, 81, 181) : nk_rgb(30, 136, 229));
 
         char welcome[200];
         snprintf(welcome, sizeof(welcome), "Selamat Bekerja, %s", g_current_user.name);
         nk_label(ctx, welcome, NK_TEXT_LEFT);
+
+        const char *theme_btn_label = g_light_mode ? "MODE GELAP" : "MODE TERANG";
+        if (nk_button_label(ctx, theme_btn_label)) {
+            g_light_mode = !g_light_mode;
+            ui_apply_theme(ctx);
+        }
 
         if (nk_button_label(ctx, "LOGOUT")) {
             g_logged_in = false;
@@ -332,7 +415,7 @@ static void draw_topbar(struct nk_context *ctx) {
 // SUB-SCREEN: Dashboard
 static void draw_dashboard(struct nk_context *ctx) {
     nk_layout_row_dynamic(ctx, 30, 1);
-    nk_label_colored(ctx, "DASHBOARD MONITORING SEKOLAH", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+    nk_label_colored(ctx, "DASHBOARD MONITORING SEKOLAH", NK_TEXT_LEFT, g_theme_text_header);
 
     // Stats Grid
     nk_layout_row_dynamic(ctx, 100, 4);
@@ -340,7 +423,7 @@ static void draw_dashboard(struct nk_context *ctx) {
     // Card 1: Total Students
     if (nk_group_begin(ctx, "CardSiswa", NK_WINDOW_BORDER)) {
         nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label_colored(ctx, "TOTAL SISWA AKTIF", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "TOTAL SISWA AKTIF", NK_TEXT_LEFT, g_theme_text_muted);
         nk_layout_row_dynamic(ctx, 40, 1);
         char buf[50];
         snprintf(buf, sizeof(buf), "%d Siswa", g_stats.total_students);
@@ -351,7 +434,7 @@ static void draw_dashboard(struct nk_context *ctx) {
     // Card 2: Total Teachers
     if (nk_group_begin(ctx, "CardGuru", NK_WINDOW_BORDER)) {
         nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label_colored(ctx, "TOTAL GURU", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "TOTAL GURU", NK_TEXT_LEFT, g_theme_text_muted);
         nk_layout_row_dynamic(ctx, 40, 1);
         char buf[50];
         snprintf(buf, sizeof(buf), "%d Guru", g_stats.total_teachers);
@@ -362,7 +445,7 @@ static void draw_dashboard(struct nk_context *ctx) {
     // Card 3: Total Classes
     if (nk_group_begin(ctx, "CardKelas", NK_WINDOW_BORDER)) {
         nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label_colored(ctx, "TOTAL KELAS", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "TOTAL KELAS", NK_TEXT_LEFT, g_theme_text_muted);
         nk_layout_row_dynamic(ctx, 40, 1);
         char buf[50];
         snprintf(buf, sizeof(buf), "%d Rombel", g_stats.total_classes);
@@ -373,7 +456,7 @@ static void draw_dashboard(struct nk_context *ctx) {
     // Card 4: Attendance Today
     if (nk_group_begin(ctx, "CardAttendance", NK_WINDOW_BORDER)) {
         nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label_colored(ctx, "KEHADIRAN HARI INI", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "KEHADIRAN HARI INI", NK_TEXT_LEFT, g_theme_text_muted);
         nk_layout_row_dynamic(ctx, 40, 1);
         char buf[50];
         snprintf(buf, sizeof(buf), "%.1f %%", g_stats.attendance_rate_today);
@@ -398,7 +481,7 @@ static void draw_dashboard(struct nk_context *ctx) {
         nk_label(ctx, " - Database & Keamanan: Ekspor laporan PDF & CSV (Excel) serta backup instan.", NK_TEXT_LEFT);
         
         nk_layout_row_dynamic(ctx, 20, 1); // Spacer
-        nk_label_colored(ctx, "Sistem berjalan penuh secara offline dengan SQLite local database engine.", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Sistem berjalan penuh secara offline dengan SQLite local database engine.", NK_TEXT_LEFT, g_theme_text_muted);
         nk_group_end(ctx);
     }
 }
@@ -406,7 +489,7 @@ static void draw_dashboard(struct nk_context *ctx) {
 // SUB-SCREEN: Students Tab
 static void draw_students_tab(struct nk_context *ctx) {
     nk_layout_row_dynamic(ctx, 30, 1);
-    nk_label_colored(ctx, "MANAJEMEN DATA MURID", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+    nk_label_colored(ctx, "MANAJEMEN DATA MURID", NK_TEXT_LEFT, g_theme_text_header);
 
     if (!g_show_form) {
         // Toolbar (Search, Filter, Export, Add Buttons)
@@ -464,15 +547,15 @@ static void draw_students_tab(struct nk_context *ctx) {
         nk_layout_row_template_end(ctx);
 
         // Header
-        nk_label_colored(ctx, "NISN", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Nama Siswa", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Kelas", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "JK", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Status", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "NISN", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Nama Siswa", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Kelas", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "JK", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Status", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, g_theme_text_muted);
 
         nk_layout_row_dynamic(ctx, 1, 1);
-        nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+        nk_rule_horizontal(ctx, g_theme_border, 1);
 
         for (int i = 0; i < g_students_count; i++) {
             nk_layout_row_template_begin(ctx, 30);
@@ -608,7 +691,7 @@ static void draw_students_tab(struct nk_context *ctx) {
 // SUB-SCREEN: Teachers Tab
 static void draw_teachers_tab(struct nk_context *ctx) {
     nk_layout_row_dynamic(ctx, 30, 1);
-    nk_label_colored(ctx, "MANAJEMEN DATA GURU", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+    nk_label_colored(ctx, "MANAJEMEN DATA GURU", NK_TEXT_LEFT, g_theme_text_header);
 
     if (!g_show_form) {
         // Toolbar
@@ -664,15 +747,15 @@ static void draw_teachers_tab(struct nk_context *ctx) {
         nk_layout_row_template_push_static(ctx, 120); // Action Buttons
         nk_layout_row_template_end(ctx);
 
-        nk_label_colored(ctx, "NIP", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Nama Guru", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "JK", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Mata Pelajaran", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Status", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "NIP", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Nama Guru", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "JK", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Mata Pelajaran", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Status", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, g_theme_text_muted);
 
         nk_layout_row_dynamic(ctx, 1, 1);
-        nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+        nk_rule_horizontal(ctx, g_theme_border, 1);
 
         for (int i = 0; i < g_teachers_count; i++) {
             nk_layout_row_template_begin(ctx, 30);
@@ -783,7 +866,7 @@ static void draw_teachers_tab(struct nk_context *ctx) {
 // SUB-SCREEN: Classes Tab
 static void draw_classes_tab(struct nk_context *ctx) {
     nk_layout_row_dynamic(ctx, 30, 1);
-    nk_label_colored(ctx, "MANAJEMEN ROMBONGAN BELAJAR (KELAS)", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+    nk_label_colored(ctx, "MANAJEMEN ROMBONGAN BELAJAR (KELAS)", NK_TEXT_LEFT, g_theme_text_header);
 
     if (!g_show_form) {
         nk_layout_row_template_begin(ctx, 35);
@@ -811,13 +894,13 @@ static void draw_classes_tab(struct nk_context *ctx) {
         nk_layout_row_template_push_static(ctx, 120); // Action Buttons
         nk_layout_row_template_end(ctx);
 
-        nk_label_colored(ctx, "Nama Kelas / Rombel", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Tahun Ajaran", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Wali Kelas", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Nama Kelas / Rombel", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Tahun Ajaran", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Wali Kelas", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, g_theme_text_muted);
 
         nk_layout_row_dynamic(ctx, 1, 1);
-        nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+        nk_rule_horizontal(ctx, g_theme_border, 1);
 
         for (int i = 0; i < g_classes_count; i++) {
             nk_layout_row_template_begin(ctx, 30);
@@ -911,7 +994,7 @@ static void draw_classes_tab(struct nk_context *ctx) {
 // SUB-SCREEN: Attendance Tab
 static void draw_attendance_tab(struct nk_context *ctx) {
     nk_layout_row_dynamic(ctx, 30, 1);
-    nk_label_colored(ctx, "PENCATATAN KEHADIRAN (ABSENSI SISWA)", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+    nk_label_colored(ctx, "PENCATATAN KEHADIRAN (ABSENSI SISWA)", NK_TEXT_LEFT, g_theme_text_header);
 
     // Toolbar (Select Class & Date)
     nk_layout_row_template_begin(ctx, 35);
@@ -991,12 +1074,12 @@ static void draw_attendance_tab(struct nk_context *ctx) {
     nk_layout_row_template_push_static(ctx, 200); // Keterangan / Notes
     nk_layout_row_template_end(ctx);
 
-    nk_label_colored(ctx, "Nama Siswa", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-    nk_label_colored(ctx, "Status Kehadiran (H | S | I | A)", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-    nk_label_colored(ctx, "Catatan / Keterangan", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+    nk_label_colored(ctx, "Nama Siswa", NK_TEXT_LEFT, g_theme_text_muted);
+    nk_label_colored(ctx, "Status Kehadiran (H | S | I | A)", NK_TEXT_LEFT, g_theme_text_muted);
+    nk_label_colored(ctx, "Catatan / Keterangan", NK_TEXT_LEFT, g_theme_text_muted);
 
     nk_layout_row_dynamic(ctx, 1, 1);
-    nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+    nk_rule_horizontal(ctx, g_theme_border, 1);
 
     for (int i = 0; i < g_attendance_count; i++) {
         nk_layout_row_template_begin(ctx, 35);
@@ -1023,7 +1106,7 @@ static void draw_attendance_tab(struct nk_context *ctx) {
 // SUB-SCREEN: Academic (CP / TP / ATP)
 static void draw_academic_tab(struct nk_context *ctx) {
     nk_layout_row_dynamic(ctx, 30, 1);
-    nk_label_colored(ctx, "KURIKULUM (CP, TP, ATP)", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+    nk_label_colored(ctx, "KURIKULUM (CP, TP, ATP)", NK_TEXT_LEFT, g_theme_text_header);
 
     // Show 3 distinct sections or tabs using Nuklear groups or simple header buttons
     static int sub_tab = 0; // 0=CP, 1=TP, 2=ATP
@@ -1065,13 +1148,13 @@ static void draw_academic_tab(struct nk_context *ctx) {
             nk_layout_row_template_push_static(ctx, 120);
             nk_layout_row_template_end(ctx);
 
-            nk_label_colored(ctx, "Kode CP", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-            nk_label_colored(ctx, "Mata Pelajaran", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-            nk_label_colored(ctx, "Deskripsi Kompetensi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-            nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+            nk_label_colored(ctx, "Kode CP", NK_TEXT_LEFT, g_theme_text_muted);
+            nk_label_colored(ctx, "Mata Pelajaran", NK_TEXT_LEFT, g_theme_text_muted);
+            nk_label_colored(ctx, "Deskripsi Kompetensi", NK_TEXT_LEFT, g_theme_text_muted);
+            nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, g_theme_text_muted);
 
             nk_layout_row_dynamic(ctx, 1, 1);
-            nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+            nk_rule_horizontal(ctx, g_theme_border, 1);
 
             for (int i = 0; i < g_cp_count; i++) {
                 nk_layout_row_template_begin(ctx, 35);
@@ -1175,13 +1258,13 @@ static void draw_academic_tab(struct nk_context *ctx) {
             nk_layout_row_template_push_static(ctx, 120);
             nk_layout_row_template_end(ctx);
 
-            nk_label_colored(ctx, "Kode TP", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-            nk_label_colored(ctx, "CP Binaan", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-            nk_label_colored(ctx, "Tujuan Pembelajaran (TP)", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-            nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+            nk_label_colored(ctx, "Kode TP", NK_TEXT_LEFT, g_theme_text_muted);
+            nk_label_colored(ctx, "CP Binaan", NK_TEXT_LEFT, g_theme_text_muted);
+            nk_label_colored(ctx, "Tujuan Pembelajaran (TP)", NK_TEXT_LEFT, g_theme_text_muted);
+            nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, g_theme_text_muted);
 
             nk_layout_row_dynamic(ctx, 1, 1);
-            nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+            nk_rule_horizontal(ctx, g_theme_border, 1);
 
             for (int i = 0; i < g_tp_count; i++) {
                 nk_layout_row_template_begin(ctx, 35);
@@ -1299,13 +1382,13 @@ static void draw_academic_tab(struct nk_context *ctx) {
             nk_layout_row_template_push_static(ctx, 120); // Action Buttons
             nk_layout_row_template_end(ctx);
 
-            nk_label_colored(ctx, "No Urut", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-            nk_label_colored(ctx, "Kode TP", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-            nk_label_colored(ctx, "Deskripsi Alur Pembelajaran (ATP)", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-            nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+            nk_label_colored(ctx, "No Urut", NK_TEXT_LEFT, g_theme_text_muted);
+            nk_label_colored(ctx, "Kode TP", NK_TEXT_LEFT, g_theme_text_muted);
+            nk_label_colored(ctx, "Deskripsi Alur Pembelajaran (ATP)", NK_TEXT_LEFT, g_theme_text_muted);
+            nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, g_theme_text_muted);
 
             nk_layout_row_dynamic(ctx, 1, 1);
-            nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+            nk_rule_horizontal(ctx, g_theme_border, 1);
 
             for (int i = 0; i < g_atp_count; i++) {
                 nk_layout_row_template_begin(ctx, 35);
@@ -1404,7 +1487,7 @@ static void draw_academic_tab(struct nk_context *ctx) {
 // SUB-SCREEN: Daily Journal
 static void draw_journal_tab(struct nk_context *ctx) {
     nk_layout_row_dynamic(ctx, 30, 1);
-    nk_label_colored(ctx, "JURNAL HARIAN GURU & AKTIVITAS ROMBEL", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+    nk_label_colored(ctx, "JURNAL HARIAN GURU & AKTIVITAS ROMBEL", NK_TEXT_LEFT, g_theme_text_header);
 
     if (!g_show_form) {
         nk_layout_row_template_begin(ctx, 35);
@@ -1438,14 +1521,14 @@ static void draw_journal_tab(struct nk_context *ctx) {
         nk_layout_row_template_push_static(ctx, 120); // Action Buttons
         nk_layout_row_template_end(ctx);
 
-        nk_label_colored(ctx, "Tanggal", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Guru Pelapor", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Kelas", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Aktivitas Pembelajaran", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Tanggal", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Guru Pelapor", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Kelas", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Aktivitas Pembelajaran", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, g_theme_text_muted);
 
         nk_layout_row_dynamic(ctx, 1, 1);
-        nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+        nk_rule_horizontal(ctx, g_theme_border, 1);
 
         for (int i = 0; i < g_journals_count; i++) {
             nk_layout_row_template_begin(ctx, 35);
@@ -1565,7 +1648,7 @@ static void draw_journal_tab(struct nk_context *ctx) {
 // SUB-SCREEN: Grades Tab
 static void draw_grades_tab(struct nk_context *ctx) {
     nk_layout_row_dynamic(ctx, 30, 1);
-    nk_label_colored(ctx, "MANAJEMEN NILAI BELAJAR SISWA & TRANSKRIP", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+    nk_label_colored(ctx, "MANAJEMEN NILAI BELAJAR SISWA & TRANSKRIP", NK_TEXT_LEFT, g_theme_text_header);
 
     // Choose Student and Load their specific grades
     nk_layout_row_template_begin(ctx, 35);
@@ -1725,7 +1808,7 @@ static void draw_grades_tab(struct nk_context *ctx) {
     // Right Column: Display Tables Group
     if (nk_group_begin(ctx, "DisplayGradesGroup", NK_WINDOW_BORDER)) {
         nk_layout_row_dynamic(ctx, 20, 1);
-        nk_label_colored(ctx, "DAFTAR CAPAIAN NILAI HARIAN", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "DAFTAR CAPAIAN NILAI HARIAN", NK_TEXT_LEFT, g_theme_text_muted);
 
         nk_layout_row_template_begin(ctx, 20);
         nk_layout_row_template_push_static(ctx, 70);  // TP code
@@ -1763,7 +1846,7 @@ static void draw_grades_tab(struct nk_context *ctx) {
         nk_layout_row_dynamic(ctx, 15, 1); // Spacer
 
         nk_layout_row_dynamic(ctx, 20, 1);
-        nk_label_colored(ctx, "DAFTAR HASIL EVALUASI UJIAN SUMATIF", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "DAFTAR HASIL EVALUASI UJIAN SUMATIF", NK_TEXT_LEFT, g_theme_text_muted);
 
         nk_layout_row_template_begin(ctx, 20);
         nk_layout_row_template_push_dynamic(ctx);     // Subject
@@ -1804,7 +1887,7 @@ static void draw_grades_tab(struct nk_context *ctx) {
 // SUB-SCREEN: Users Tab (Admin Only)
 static void draw_users_tab(struct nk_context *ctx) {
     nk_layout_row_dynamic(ctx, 30, 1);
-    nk_label_colored(ctx, "MANAJEMEN PENGGUNA APLIKASI (USERS)", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+    nk_label_colored(ctx, "MANAJEMEN PENGGUNA APLIKASI (USERS)", NK_TEXT_LEFT, g_theme_text_header);
 
     if (g_current_user.role != ROLE_ADMIN) {
         nk_layout_row_dynamic(ctx, 40, 1);
@@ -1838,13 +1921,13 @@ static void draw_users_tab(struct nk_context *ctx) {
         nk_layout_row_template_push_static(ctx, 120); // Actions
         nk_layout_row_template_end(ctx);
 
-        nk_label_colored(ctx, "Username", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Nama Lengkap", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Peran (Role)", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
-        nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Username", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Nama Lengkap", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Peran (Role)", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, g_theme_text_muted);
 
         nk_layout_row_dynamic(ctx, 1, 1);
-        nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+        nk_rule_horizontal(ctx, g_theme_border, 1);
 
         for (int i = 0; i < g_users_count; i++) {
             nk_layout_row_template_begin(ctx, 30);
@@ -1938,7 +2021,7 @@ static void draw_users_tab(struct nk_context *ctx) {
 // SUB-SCREEN: Backup & Restore
 static void draw_backup_tab(struct nk_context *ctx) {
     nk_layout_row_dynamic(ctx, 30, 1);
-    nk_label_colored(ctx, "BACKUP & RESTORE DATABASE SQLITE", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+    nk_label_colored(ctx, "BACKUP & RESTORE DATABASE SQLITE", NK_TEXT_LEFT, g_theme_text_header);
 
     nk_layout_row_dynamic(ctx, 20, 1); // Spacer
 
