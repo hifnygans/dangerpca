@@ -77,10 +77,11 @@ int main(int argc, char *argv[]) {
     }
 
     // 6. Load TrueType Font (Roboto & FontAwesome) with robust path fallback
-    struct nk_font_atlas *atlas;
+        struct nk_font_atlas *atlas;
     nk_sdl_font_stash_begin(&atlas);
     
     struct nk_font *roboto = NULL;
+    struct nk_font *fa = NULL;
     struct nk_font_config cfg = nk_font_config(15);
     static const nk_rune fa_range[] = {0xf000, 0xf900, 0};
     struct nk_font_config fa_cfg = nk_font_config(14);
@@ -88,9 +89,16 @@ int main(int argc, char *argv[]) {
     fa_cfg.range = fa_range;
 
     // Fallback 1: Local assets folder (current working directory)
+    printf("Font Load Fallback 1: Checking local assets folder...\n");
     roboto = nk_font_atlas_add_from_file(atlas, "assets/Roboto-Regular.ttf", 15, &cfg);
     if (roboto) {
-        nk_font_atlas_add_from_file(atlas, "assets/fa-solid-900.ttf", 14, &fa_cfg);
+        printf("Successfully loaded assets/Roboto-Regular.ttf\n");
+        fa = nk_font_atlas_add_from_file(atlas, "assets/fa-solid-900.ttf", 14, &fa_cfg);
+        if (fa) {
+            printf("Successfully merged assets/fa-solid-900.ttf\n");
+        } else {
+            printf("Failed to load assets/fa-solid-900.ttf!\n");
+        }
     }
     
     // Fallback 2: Executable relative path
@@ -100,19 +108,33 @@ int main(int argc, char *argv[]) {
             char font_path[512];
             char fa_path[512];
             snprintf(font_path, sizeof(font_path), "%sassets/Roboto-Regular.ttf", base_path);
+            printf("Font Load Fallback 2: Checking base path: %s\n", font_path);
             roboto = nk_font_atlas_add_from_file(atlas, font_path, 15, &cfg);
             if (roboto) {
+                printf("Successfully loaded %s\n", font_path);
                 snprintf(fa_path, sizeof(fa_path), "%sassets/fa-solid-900.ttf", base_path);
-                nk_font_atlas_add_from_file(atlas, fa_path, 14, &fa_cfg);
+                fa = nk_font_atlas_add_from_file(atlas, fa_path, 14, &fa_cfg);
+                if (fa) {
+                    printf("Successfully merged %s\n", fa_path);
+                } else {
+                    printf("Failed to load %s!\n", fa_path);
+                }
             }
             
             // Fallback 3: Installed Debian path (relative to /usr/bin)
             if (!roboto) {
                 snprintf(font_path, sizeof(font_path), "%s../share/dangerpca/assets/Roboto-Regular.ttf", base_path);
+                printf("Font Load Fallback 3: Checking relative share path: %s\n", font_path);
                 roboto = nk_font_atlas_add_from_file(atlas, font_path, 15, &cfg);
                 if (roboto) {
+                    printf("Successfully loaded %s\n", font_path);
                     snprintf(fa_path, sizeof(fa_path), "%s../share/dangerpca/assets/fa-solid-900.ttf", base_path);
-                    nk_font_atlas_add_from_file(atlas, fa_path, 14, &fa_cfg);
+                    fa = nk_font_atlas_add_from_file(atlas, fa_path, 14, &fa_cfg);
+                    if (fa) {
+                        printf("Successfully merged %s\n", fa_path);
+                    } else {
+                        printf("Failed to load %s!\n", fa_path);
+                    }
                 }
             }
             SDL_free(base_path);
@@ -121,9 +143,16 @@ int main(int argc, char *argv[]) {
     
     // Fallback 4: Absolute Linux installation directory
     if (!roboto) {
+        printf("Font Load Fallback 4: Checking absolute share path /usr/share/dangerpca/assets/...\n");
         roboto = nk_font_atlas_add_from_file(atlas, "/usr/share/dangerpca/assets/Roboto-Regular.ttf", 15, &cfg);
         if (roboto) {
-            nk_font_atlas_add_from_file(atlas, "/usr/share/dangerpca/assets/fa-solid-900.ttf", 14, &fa_cfg);
+            printf("Successfully loaded absolute path Roboto\n");
+            fa = nk_font_atlas_add_from_file(atlas, "/usr/share/dangerpca/assets/fa-solid-900.ttf", 14, &fa_cfg);
+            if (fa) {
+                printf("Successfully merged absolute path FontAwesome\n");
+            } else {
+                printf("Failed to load absolute path FontAwesome!\n");
+            }
         }
     }
 

@@ -14,7 +14,7 @@
 #include <time.h>
 
 // FontAwesome solid icons macros in UTF-8
-#define ICON_DASHBOARD   "\xef\x83\xa4"
+#define ICON_DASHBOARD   "\xef\x8f\xbd"
 #define ICON_STUDENTS    "\xef\x83\x80"
 #define ICON_TEACHERS    "\xef\x94\x9b"
 #define ICON_CLASSES     "\xef\x95\x89"
