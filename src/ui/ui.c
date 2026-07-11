@@ -413,12 +413,15 @@ static void draw_topbar(struct nk_context *ctx) {
 }
 
 // SUB-SCREEN: Dashboard
-static void draw_dashboard(struct nk_context *ctx) {
+static void draw_dashboard(struct nk_context *ctx, int screen_width) {
     nk_layout_row_dynamic(ctx, 30, 1);
     nk_label_colored(ctx, "DASHBOARD MONITORING SEKOLAH", NK_TEXT_LEFT, g_theme_text_header);
 
-    // Stats Grid
-    nk_layout_row_dynamic(ctx, 100, 4);
+    // Stats Grid - Responsive columns
+    int stats_cols = 4;
+    if (screen_width < 900) stats_cols = 2;
+    if (screen_width < 600) stats_cols = 1;
+    nk_layout_row_dynamic(ctx, 100, stats_cols);
 
     // Card 1: Total Students
     if (nk_group_begin(ctx, "CardSiswa", NK_WINDOW_BORDER)) {
@@ -466,12 +469,25 @@ static void draw_dashboard(struct nk_context *ctx) {
 
     nk_layout_row_dynamic(ctx, 20, 1); // Spacer
 
+    // Hero banner section
+    ctx->style.window.background = g_light_mode ? nk_rgb(232, 234, 246) : nk_rgb(33, 33, 33);
+    nk_layout_row_dynamic(ctx, 90, 1);
+    if (nk_group_begin(ctx, "HeroSection", NK_WINDOW_BORDER)) {
+        nk_layout_row_dynamic(ctx, 28, 1);
+        nk_label_colored(ctx, "DANGERPCA ERP SEKOLAH (OFFLINE DESKTOP)", NK_TEXT_LEFT, g_light_mode ? nk_rgb(63, 81, 181) : nk_rgb(30, 136, 229));
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label(ctx, "Sistem berjalan penuh secara offline dengan local database SQLite berkecepatan tinggi.", NK_TEXT_LEFT);
+        nk_group_end(ctx);
+    }
+    ui_apply_theme(ctx); // Restore theme styling
+
+    nk_layout_row_dynamic(ctx, 15, 1); // Spacer
+
     // Overview details
-    nk_layout_row_dynamic(ctx, 260, 1);
+    nk_layout_row_dynamic(ctx, 180, 1);
     if (nk_group_begin(ctx, "AppOverview", NK_WINDOW_BORDER)) {
-        nk_layout_row_dynamic(ctx, 30, 1);
-        nk_label(ctx, "Selamat datang di Sistem ERP Sekolah Offline (Commercial Grade).", NK_TEXT_LEFT);
-        nk_label(ctx, "Fitur-fitur utama:", NK_TEXT_LEFT);
+        nk_layout_row_dynamic(ctx, 24, 1);
+        nk_label(ctx, "Fitur-fitur utama yang tersedia:", NK_TEXT_LEFT);
         
         nk_layout_row_dynamic(ctx, 20, 1);
         nk_label(ctx, " - Manajemen data Murid, Guru, dan Rombongan Belajar (Kelas).", NK_TEXT_LEFT);
@@ -479,59 +495,89 @@ static void draw_dashboard(struct nk_context *ctx) {
         nk_label(ctx, " - Kurikulum: Capaian Pembelajaran (CP), Tujuan Pembelajaran (TP) & ATP.", NK_TEXT_LEFT);
         nk_label(ctx, " - Evaluasi Belajar: Nilai Harian format TP & Ujian Akhir (UTS/UAS).", NK_TEXT_LEFT);
         nk_label(ctx, " - Database & Keamanan: Ekspor laporan PDF & CSV (Excel) serta backup instan.", NK_TEXT_LEFT);
-        
-        nk_layout_row_dynamic(ctx, 20, 1); // Spacer
-        nk_label_colored(ctx, "Sistem berjalan penuh secara offline dengan SQLite local database engine.", NK_TEXT_LEFT, g_theme_text_muted);
         nk_group_end(ctx);
     }
 }
 
 // SUB-SCREEN: Students Tab
-static void draw_students_tab(struct nk_context *ctx) {
+static void draw_students_tab(struct nk_context *ctx, int screen_width) {
     nk_layout_row_dynamic(ctx, 30, 1);
     nk_label_colored(ctx, "MANAJEMEN DATA MURID", NK_TEXT_LEFT, g_theme_text_header);
 
     if (!g_show_form) {
-        // Toolbar (Search, Filter, Export, Add Buttons)
-        nk_layout_row_template_begin(ctx, 35);
-        nk_layout_row_template_push_static(ctx, 150); // Search bar
-        nk_layout_row_template_push_static(ctx, 100); // Search button
-        nk_layout_row_template_push_static(ctx, 120); // Export CSV
-        nk_layout_row_template_push_static(ctx, 120); // Export PDF
-        nk_layout_row_template_push_dynamic(ctx);     // Spacer
-        nk_layout_row_template_push_static(ctx, 150); // Tambah Siswa button
-        nk_layout_row_template_end(ctx);
+        // Toolbar (Search, Filter, Export, Add Buttons) - Responsive
+        if (screen_width < 750) {
+            nk_layout_row_template_begin(ctx, 35);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_push_static(ctx, 80);
+            nk_layout_row_template_end(ctx);
+            nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_search_query, sizeof(g_search_query), nk_filter_ascii);
+            if (nk_button_label(ctx, "Cari")) {
+                load_tab_data(MENU_STUDENTS);
+            }
 
-        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_search_query, sizeof(g_search_query), nk_filter_ascii);
-        if (nk_button_label(ctx, "Cari")) {
-            load_tab_data(MENU_STUDENTS);
-        }
-        if (nk_button_label(ctx, "Ekspor CSV")) {
-            if (service_export_students_csv("siswa_export.csv")) {
-                show_notification("Sukses mengekspor siswa_export.csv!", true);
-            } else {
-                show_notification("Gagal mengekspor CSV!", false);
+            nk_layout_row_dynamic(ctx, 35, 3);
+            if (nk_button_label(ctx, "CSV")) {
+                if (service_export_students_csv("siswa_export.csv")) show_notification("Sukses mengekspor CSV!", true);
+                else show_notification("Gagal mengekspor CSV!", false);
             }
-        }
-        if (nk_button_label(ctx, "Ekspor PDF")) {
-            if (service_export_students_pdf("siswa_export.pdf")) {
-                show_notification("Sukses mengekspor siswa_export.pdf!", true);
-            } else {
-                show_notification("Gagal mengekspor PDF!", false);
+            if (nk_button_label(ctx, "PDF")) {
+                if (service_export_students_pdf("siswa_export.pdf")) show_notification("Sukses mengekspor PDF!", true);
+                else show_notification("Gagal mengekspor PDF!", false);
             }
-        }
-        nk_spacing(ctx, 1);
-        if (nk_button_label(ctx, "+ TAMBAH SISWA")) {
-            g_show_form = true;
-            g_is_editing = false;
-            g_editing_id = 0;
-            g_form_txt1[0] = '\0'; // nisn
-            g_form_txt2[0] = '\0'; // nama
+            if (nk_button_label(ctx, "+ SISWA")) {
+                g_show_form = true;
+                g_is_editing = false;
+                g_editing_id = 0;
+                g_form_txt1[0] = '\0'; // nisn
+                g_form_txt2[0] = '\0'; // nama
+                g_form_txt3[0] = '\0'; // dob
+                g_form_txt4[0] = '\0'; // address
+                g_form_int1 = 0;       // class index
+                g_form_gender_idx = 0; // L
+                g_form_status_idx = 0; // Aktif
+            }
+        } else {
+            nk_layout_row_template_begin(ctx, 35);
+            nk_layout_row_template_push_static(ctx, 150); // Search bar
+            nk_layout_row_template_push_static(ctx, 100); // Search button
+            nk_layout_row_template_push_static(ctx, 120); // Export CSV
+            nk_layout_row_template_push_static(ctx, 120); // Export PDF
+            nk_layout_row_template_push_dynamic(ctx);     // Spacer
+            nk_layout_row_template_push_static(ctx, 150); // Tambah Siswa button
+            nk_layout_row_template_end(ctx);
+
+            nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_search_query, sizeof(g_search_query), nk_filter_ascii);
+            if (nk_button_label(ctx, "Cari")) {
+                load_tab_data(MENU_STUDENTS);
+            }
+            if (nk_button_label(ctx, "Ekspor CSV")) {
+                if (service_export_students_csv("siswa_export.csv")) {
+                    show_notification("Sukses mengekspor siswa_export.csv!", true);
+                } else {
+                    show_notification("Gagal mengekspor CSV!", false);
+                }
+            }
+            if (nk_button_label(ctx, "Ekspor PDF")) {
+                if (service_export_students_pdf("siswa_export.pdf")) {
+                    show_notification("Sukses mengekspor siswa_export.pdf!", true);
+                } else {
+                    show_notification("Gagal mengekspor PDF!", false);
+                }
+            }
+            nk_spacing(ctx, 1);
+            if (nk_button_label(ctx, "+ TAMBAH SISWA")) {
+                g_show_form = true;
+                g_is_editing = false;
+                g_editing_id = 0;
+                g_form_txt1[0] = '\0'; // nisn
+                g_form_txt2[0] = '\0'; // nama
             g_form_txt3[0] = '\0'; // dob
             g_form_txt4[0] = '\0'; // address
             g_form_int1 = 0;       // class index
             g_form_gender_idx = 0; // L
             g_form_status_idx = 0; // Aktif
+            }
         }
 
         nk_layout_row_dynamic(ctx, 15, 1); // Spacer
@@ -689,50 +735,81 @@ static void draw_students_tab(struct nk_context *ctx) {
 }
 
 // SUB-SCREEN: Teachers Tab
-static void draw_teachers_tab(struct nk_context *ctx) {
+static void draw_teachers_tab(struct nk_context *ctx, int screen_width) {
     nk_layout_row_dynamic(ctx, 30, 1);
     nk_label_colored(ctx, "MANAJEMEN DATA GURU", NK_TEXT_LEFT, g_theme_text_header);
 
     if (!g_show_form) {
-        // Toolbar
-        nk_layout_row_template_begin(ctx, 35);
-        nk_layout_row_template_push_static(ctx, 150); // Search bar
-        nk_layout_row_template_push_static(ctx, 100); // Search button
-        nk_layout_row_template_push_static(ctx, 120); // Export CSV
-        nk_layout_row_template_push_static(ctx, 120); // Export PDF
-        nk_layout_row_template_push_dynamic(ctx);     // Spacer
-        nk_layout_row_template_push_static(ctx, 150); // Tambah Guru button
-        nk_layout_row_template_end(ctx);
+        // Toolbar (Search, Filter, Export, Add Buttons) - Responsive
+        if (screen_width < 750) {
+            nk_layout_row_template_begin(ctx, 35);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_push_static(ctx, 80);
+            nk_layout_row_template_end(ctx);
+            nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_search_query, sizeof(g_search_query), nk_filter_ascii);
+            if (nk_button_label(ctx, "Cari")) {
+                load_tab_data(MENU_TEACHERS);
+            }
 
-        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_search_query, sizeof(g_search_query), nk_filter_ascii);
-        if (nk_button_label(ctx, "Cari")) {
-            load_tab_data(MENU_TEACHERS);
-        }
-        if (nk_button_label(ctx, "Ekspor CSV")) {
-            if (service_export_teachers_csv("guru_export.csv")) {
-                show_notification("Sukses mengekspor guru_export.csv!", true);
-            } else {
-                show_notification("Gagal mengekspor CSV!", false);
+            nk_layout_row_dynamic(ctx, 35, 3);
+            if (nk_button_label(ctx, "CSV")) {
+                if (service_export_teachers_csv("guru_export.csv")) show_notification("Sukses mengekspor CSV!", true);
+                else show_notification("Gagal mengekspor CSV!", false);
             }
-        }
-        if (nk_button_label(ctx, "Ekspor PDF")) {
-            if (service_export_teachers_pdf("guru_export.pdf")) {
-                show_notification("Sukses mengekspor guru_export.pdf!", true);
-            } else {
-                show_notification("Gagal mengekspor PDF!", false);
+            if (nk_button_label(ctx, "PDF")) {
+                if (service_export_teachers_pdf("guru_export.pdf")) show_notification("Sukses mengekspor PDF!", true);
+                else show_notification("Gagal mengekspor PDF!", false);
             }
-        }
-        nk_spacing(ctx, 1);
-        if (nk_button_label(ctx, "+ TAMBAH GURU")) {
-            g_show_form = true;
-            g_is_editing = false;
-            g_editing_id = 0;
-            g_form_txt1[0] = '\0'; // nip
+            if (nk_button_label(ctx, "+ GURU")) {
+                g_show_form = true;
+                g_is_editing = false;
+                g_editing_id = 0;
+                g_form_txt1[0] = '\0'; // nip
+                g_form_txt2[0] = '\0'; // nama
+                g_form_txt3[0] = '\0'; // mapel
+                g_form_gender_idx = 0; // L
+                g_form_status_idx = 0; // Aktif
+            }
+        } else {
+            nk_layout_row_template_begin(ctx, 35);
+            nk_layout_row_template_push_static(ctx, 150); // Search bar
+            nk_layout_row_template_push_static(ctx, 100); // Search button
+            nk_layout_row_template_push_static(ctx, 120); // Export CSV
+            nk_layout_row_template_push_static(ctx, 120); // Export PDF
+            nk_layout_row_template_push_dynamic(ctx);     // Spacer
+            nk_layout_row_template_push_static(ctx, 150); // Tambah Guru button
+            nk_layout_row_template_end(ctx);
+
+            nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_search_query, sizeof(g_search_query), nk_filter_ascii);
+            if (nk_button_label(ctx, "Cari")) {
+                load_tab_data(MENU_TEACHERS);
+            }
+            if (nk_button_label(ctx, "Ekspor CSV")) {
+                if (service_export_teachers_csv("guru_export.csv")) {
+                    show_notification("Sukses mengekspor guru_export.csv!", true);
+                } else {
+                    show_notification("Gagal mengekspor CSV!", false);
+                }
+            }
+            if (nk_button_label(ctx, "Ekspor PDF")) {
+                if (service_export_teachers_pdf("guru_export.pdf")) {
+                    show_notification("Sukses mengekspor guru_export.pdf!", true);
+                } else {
+                    show_notification("Gagal mengekspor PDF!", false);
+                }
+            }
+            nk_spacing(ctx, 1);
+            if (nk_button_label(ctx, "+ TAMBAH GURU")) {
+                g_show_form = true;
+                g_is_editing = false;
+                g_editing_id = 0;
+                g_form_txt1[0] = '\0'; // nip
             g_form_txt2[0] = '\0'; // nama
             g_form_txt3[0] = '\0'; // subject
             g_form_txt4[0] = '\0'; // phone
             g_form_gender_idx = 0; // L
             g_form_status_idx = 0; // Aktif
+            }
         }
 
         nk_layout_row_dynamic(ctx, 15, 1); // Spacer
@@ -864,17 +941,21 @@ static void draw_teachers_tab(struct nk_context *ctx) {
 }
 
 // SUB-SCREEN: Classes Tab
-static void draw_classes_tab(struct nk_context *ctx) {
+static void draw_classes_tab(struct nk_context *ctx, int screen_width) {
     nk_layout_row_dynamic(ctx, 30, 1);
     nk_label_colored(ctx, "MANAJEMEN ROMBONGAN BELAJAR (KELAS)", NK_TEXT_LEFT, g_theme_text_header);
 
     if (!g_show_form) {
-        nk_layout_row_template_begin(ctx, 35);
-        nk_layout_row_template_push_dynamic(ctx);
-        nk_layout_row_template_push_static(ctx, 180);
-        nk_layout_row_template_end(ctx);
+        if (screen_width < 400) {
+            nk_layout_row_dynamic(ctx, 35, 1);
+        } else {
+            nk_layout_row_template_begin(ctx, 35);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_push_static(ctx, 180);
+            nk_layout_row_template_end(ctx);
+            nk_spacing(ctx, 1);
+        }
         
-        nk_spacing(ctx, 1);
         if (nk_button_label(ctx, "+ TAMBAH ROMBEL KELAS")) {
             g_show_form = true;
             g_is_editing = false;
@@ -992,75 +1073,132 @@ static void draw_classes_tab(struct nk_context *ctx) {
 }
 
 // SUB-SCREEN: Attendance Tab
-static void draw_attendance_tab(struct nk_context *ctx) {
+static void draw_attendance_tab(struct nk_context *ctx, int screen_width) {
     nk_layout_row_dynamic(ctx, 30, 1);
     nk_label_colored(ctx, "PENCATATAN KEHADIRAN (ABSENSI SISWA)", NK_TEXT_LEFT, g_theme_text_header);
 
-    // Toolbar (Select Class & Date)
-    nk_layout_row_template_begin(ctx, 35);
-    nk_layout_row_template_push_static(ctx, 150); // Class dropdown
-    nk_layout_row_template_push_static(ctx, 120); // Date input
-    nk_layout_row_template_push_static(ctx, 100); // Load Button
-    nk_layout_row_template_push_static(ctx, 120); // Save Button
-    nk_layout_row_template_push_dynamic(ctx);     // Spacer
-    nk_layout_row_template_push_static(ctx, 120); // Export CSV
-    nk_layout_row_template_push_static(ctx, 120); // Export PDF
-    nk_layout_row_template_end(ctx);
-
-    const char *class_options[100];
-    for (int c = 0; c < g_classes_count; c++) {
-        class_options[c] = g_classes[c].name;
-    }
-    
-    if (g_classes_count > 0) {
-        g_selected_class_idx = nk_combo(ctx, class_options, g_classes_count, g_selected_class_idx, 25, nk_vec2(180, 200));
-    } else {
-        nk_label(ctx, "Belum ada kelas!", NK_TEXT_LEFT);
-    }
-    
-    nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_attendance_date, sizeof(g_attendance_date), nk_filter_ascii);
-    
-    if (nk_button_label(ctx, "Muat")) {
-        load_tab_data(MENU_ATTENDANCE);
-    }
-
-    if (nk_button_label(ctx, "SIMPAN SEMUA")) {
-        bool all_ok = true;
-        for (int i = 0; i < g_attendance_count; i++) {
-            if (!db_save_attendance(g_attendance[i].student_id, g_attendance_date, g_attendance[i].status, g_attendance[i].notes)) {
-                all_ok = false;
-            }
+    // Toolbar (Select Class & Date) - Responsive
+    if (screen_width < 750) {
+        nk_layout_row_dynamic(ctx, 35, 2);
+        const char *class_options[100];
+        for (int c = 0; c < g_classes_count; c++) {
+            class_options[c] = g_classes[c].name;
         }
-        if (all_ok) {
-            show_notification("Absensi berhasil disimpan ke database.", true);
-            db_get_dashboard_stats(&g_stats); // update stats
+        if (g_classes_count > 0) {
+            g_selected_class_idx = nk_combo(ctx, class_options, g_classes_count, g_selected_class_idx, 25, nk_vec2(180, 200));
         } else {
-            show_notification("Gagal menyimpan beberapa absensi!", false);
+            nk_label(ctx, "Belum ada kelas!", NK_TEXT_LEFT);
         }
-    }
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_attendance_date, sizeof(g_attendance_date), nk_filter_ascii);
 
-    nk_spacing(ctx, 1);
-    
-    if (nk_button_label(ctx, "Ekspor CSV")) {
-        if (g_classes_count > 0) {
-            char filename[128];
-            snprintf(filename, sizeof(filename), "absensi_%s_%s.csv", g_classes[g_selected_class_idx].name, g_attendance_date);
-            if (service_export_attendance_csv(filename, g_attendance_date, g_classes[g_selected_class_idx].id, g_classes[g_selected_class_idx].name)) {
-                show_notification("CSV berhasil diekspor!", true);
+        nk_layout_row_dynamic(ctx, 35, 2);
+        if (nk_button_label(ctx, "Muat")) {
+            load_tab_data(MENU_ATTENDANCE);
+        }
+        if (nk_button_label(ctx, "SIMPAN SEMUA")) {
+            bool all_ok = true;
+            for (int i = 0; i < g_attendance_count; i++) {
+                if (!db_save_attendance(g_attendance[i].student_id, g_attendance_date, g_attendance[i].status, g_attendance[i].notes)) {
+                    all_ok = false;
+                }
+            }
+            if (all_ok) {
+                show_notification("Absensi berhasil disimpan.", true);
+                db_get_dashboard_stats(&g_stats); // update stats
             } else {
-                show_notification("Gagal ekspor CSV!", false);
+                show_notification("Gagal menyimpan beberapa absensi!", false);
             }
         }
-    }
 
-    if (nk_button_label(ctx, "Ekspor PDF")) {
+        nk_layout_row_dynamic(ctx, 35, 2);
+        if (nk_button_label(ctx, "Ekspor CSV")) {
+            if (g_classes_count > 0) {
+                char filename[128];
+                snprintf(filename, sizeof(filename), "absensi_%s_%s.csv", g_classes[g_selected_class_idx].name, g_attendance_date);
+                if (service_export_attendance_csv(filename, g_attendance_date, g_classes[g_selected_class_idx].id, g_classes[g_selected_class_idx].name)) {
+                    show_notification("CSV berhasil diekspor!", true);
+                } else {
+                    show_notification("Gagal ekspor CSV!", false);
+                }
+            }
+        }
+        if (nk_button_label(ctx, "Ekspor PDF")) {
+            if (g_classes_count > 0) {
+                char filename[128];
+                snprintf(filename, sizeof(filename), "absensi_%s_%s.pdf", g_classes[g_selected_class_idx].name, g_attendance_date);
+                if (service_export_attendance_pdf(filename, g_attendance_date, g_classes[g_selected_class_idx].id, g_classes[g_selected_class_idx].name)) {
+                    show_notification("PDF berhasil diekspor!", true);
+                } else {
+                    show_notification("Gagal ekspor PDF!", false);
+                }
+            }
+        }
+    } else {
+        nk_layout_row_template_begin(ctx, 35);
+        nk_layout_row_template_push_static(ctx, 150); // Class dropdown
+        nk_layout_row_template_push_static(ctx, 120); // Date input
+        nk_layout_row_template_push_static(ctx, 100); // Load Button
+        nk_layout_row_template_push_static(ctx, 120); // Save Button
+        nk_layout_row_template_push_dynamic(ctx);     // Spacer
+        nk_layout_row_template_push_static(ctx, 120); // Export CSV
+        nk_layout_row_template_push_static(ctx, 120); // Export PDF
+        nk_layout_row_template_end(ctx);
+
+        const char *class_options[100];
+        for (int c = 0; c < g_classes_count; c++) {
+            class_options[c] = g_classes[c].name;
+        }
+        
         if (g_classes_count > 0) {
-            char filename[128];
-            snprintf(filename, sizeof(filename), "absensi_%s_%s.pdf", g_classes[g_selected_class_idx].name, g_attendance_date);
-            if (service_export_attendance_pdf(filename, g_attendance_date, g_classes[g_selected_class_idx].id, g_classes[g_selected_class_idx].name)) {
-                show_notification("PDF berhasil diekspor!", true);
+            g_selected_class_idx = nk_combo(ctx, class_options, g_classes_count, g_selected_class_idx, 25, nk_vec2(180, 200));
+        } else {
+            nk_label(ctx, "Belum ada kelas!", NK_TEXT_LEFT);
+        }
+        
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_attendance_date, sizeof(g_attendance_date), nk_filter_ascii);
+        
+        if (nk_button_label(ctx, "Muat")) {
+            load_tab_data(MENU_ATTENDANCE);
+        }
+
+        if (nk_button_label(ctx, "SIMPAN SEMUA")) {
+            bool all_ok = true;
+            for (int i = 0; i < g_attendance_count; i++) {
+                if (!db_save_attendance(g_attendance[i].student_id, g_attendance_date, g_attendance[i].status, g_attendance[i].notes)) {
+                    all_ok = false;
+                }
+            }
+            if (all_ok) {
+                show_notification("Absensi berhasil disimpan ke database.", true);
+                db_get_dashboard_stats(&g_stats); // update stats
             } else {
-                show_notification("Gagal ekspor PDF!", false);
+                show_notification("Gagal menyimpan beberapa absensi!", false);
+            }
+        }
+
+        nk_spacing(ctx, 1);
+        
+        if (nk_button_label(ctx, "Ekspor CSV")) {
+            if (g_classes_count > 0) {
+                char filename[128];
+                snprintf(filename, sizeof(filename), "absensi_%s_%s.csv", g_classes[g_selected_class_idx].name, g_attendance_date);
+                if (service_export_attendance_csv(filename, g_attendance_date, g_classes[g_selected_class_idx].id, g_classes[g_selected_class_idx].name)) {
+                    show_notification("CSV berhasil diekspor!", true);
+                } else {
+                    show_notification("Gagal ekspor CSV!", false);
+                }
+            }
+        }
+
+        if (nk_button_label(ctx, "Ekspor PDF")) {
+            if (g_classes_count > 0) {
+                char filename[128];
+                snprintf(filename, sizeof(filename), "absensi_%s_%s.pdf", g_classes[g_selected_class_idx].name, g_attendance_date);
+                if (service_export_attendance_pdf(filename, g_attendance_date, g_classes[g_selected_class_idx].id, g_classes[g_selected_class_idx].name)) {
+                    show_notification("PDF berhasil diekspor!", true);
+                } else {
+                    show_notification("Gagal ekspor PDF!", false);
+                }
             }
         }
     }
@@ -1104,39 +1242,61 @@ static void draw_attendance_tab(struct nk_context *ctx) {
 }
 
 // SUB-SCREEN: Academic (CP / TP / ATP)
-static void draw_academic_tab(struct nk_context *ctx) {
+static void draw_academic_tab(struct nk_context *ctx, int screen_width) {
     nk_layout_row_dynamic(ctx, 30, 1);
     nk_label_colored(ctx, "KURIKULUM (CP, TP, ATP)", NK_TEXT_LEFT, g_theme_text_header);
 
     // Show 3 distinct sections or tabs using Nuklear groups or simple header buttons
     static int sub_tab = 0; // 0=CP, 1=TP, 2=ATP
-    nk_layout_row_dynamic(ctx, 30, 3);
-    if (nk_button_label(ctx, "Capaian Pembelajaran (CP)")) sub_tab = 0;
-    if (nk_button_label(ctx, "Tujuan Pembelajaran (TP)")) sub_tab = 1;
-    if (nk_button_label(ctx, "Alur Tujuan Pembelajaran (ATP)")) sub_tab = 2;
+    if (screen_width < 600) {
+        nk_layout_row_dynamic(ctx, 30, 3);
+        if (nk_button_label(ctx, "CP")) sub_tab = 0;
+        if (nk_button_label(ctx, "TP")) sub_tab = 1;
+        if (nk_button_label(ctx, "ATP")) sub_tab = 2;
+    } else {
+        nk_layout_row_dynamic(ctx, 30, 3);
+        if (nk_button_label(ctx, "Capaian Pembelajaran (CP)")) sub_tab = 0;
+        if (nk_button_label(ctx, "Tujuan Pembelajaran (TP)")) sub_tab = 1;
+        if (nk_button_label(ctx, "Alur Tujuan Pembelajaran (ATP)")) sub_tab = 2;
+    }
 
     nk_layout_row_dynamic(ctx, 15, 1); // Spacer
 
     if (sub_tab == 0) {
         // CP Section
         if (!g_show_form) {
-            nk_layout_row_template_begin(ctx, 35);
-            nk_layout_row_template_push_static(ctx, 150); // Search bar
-            nk_layout_row_template_push_static(ctx, 80);  // Search btn
-            nk_layout_row_template_push_dynamic(ctx);
-            nk_layout_row_template_push_static(ctx, 150); // Add btn
-            nk_layout_row_template_end(ctx);
+            if (screen_width < 500) {
+                nk_layout_row_dynamic(ctx, 35, 1);
+                nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_search_query, sizeof(g_search_query), nk_filter_ascii);
+                nk_layout_row_dynamic(ctx, 35, 2);
+                if (nk_button_label(ctx, "Cari")) load_tab_data(MENU_ACADEMIC);
+                if (nk_button_label(ctx, "+ CP")) {
+                    g_show_form = true;
+                    g_is_editing = false;
+                    g_editing_id = 0;
+                    g_form_txt1[0] = '\0'; // Kode
+                    g_form_txt2[0] = '\0'; // Subject
+                    g_form_txt3[0] = '\0'; // Description
+                }
+            } else {
+                nk_layout_row_template_begin(ctx, 35);
+                nk_layout_row_template_push_static(ctx, 150); // Search bar
+                nk_layout_row_template_push_static(ctx, 80);  // Search btn
+                nk_layout_row_template_push_dynamic(ctx);
+                nk_layout_row_template_push_static(ctx, 150); // Add btn
+                nk_layout_row_template_end(ctx);
 
-            nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_search_query, sizeof(g_search_query), nk_filter_ascii);
-            if (nk_button_label(ctx, "Cari")) load_tab_data(MENU_ACADEMIC);
-            nk_spacing(ctx, 1);
-            if (nk_button_label(ctx, "+ TAMBAH CP")) {
-                g_show_form = true;
-                g_is_editing = false;
-                g_editing_id = 0;
-                g_form_txt1[0] = '\0'; // Kode
-                g_form_txt2[0] = '\0'; // Subject
-                g_form_txt3[0] = '\0'; // Description
+                nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_search_query, sizeof(g_search_query), nk_filter_ascii);
+                if (nk_button_label(ctx, "Cari")) load_tab_data(MENU_ACADEMIC);
+                nk_spacing(ctx, 1);
+                if (nk_button_label(ctx, "+ TAMBAH CP")) {
+                    g_show_form = true;
+                    g_is_editing = false;
+                    g_editing_id = 0;
+                    g_form_txt1[0] = '\0'; // Kode
+                    g_form_txt2[0] = '\0'; // Subject
+                    g_form_txt3[0] = '\0'; // Description
+                }
             }
 
             nk_layout_row_dynamic(ctx, 15, 1); // Spacer
@@ -1234,12 +1394,15 @@ static void draw_academic_tab(struct nk_context *ctx) {
     else if (sub_tab == 1) {
         // TP Section
         if (!g_show_form) {
-            nk_layout_row_template_begin(ctx, 35);
-            nk_layout_row_template_push_dynamic(ctx);
-            nk_layout_row_template_push_static(ctx, 150);
-            nk_layout_row_template_end(ctx);
-
-            nk_spacing(ctx, 1);
+            if (screen_width < 400) {
+                nk_layout_row_dynamic(ctx, 35, 1);
+            } else {
+                nk_layout_row_template_begin(ctx, 35);
+                nk_layout_row_template_push_dynamic(ctx);
+                nk_layout_row_template_push_static(ctx, 150);
+                nk_layout_row_template_end(ctx);
+                nk_spacing(ctx, 1);
+            }
             if (nk_button_label(ctx, "+ TAMBAH TP")) {
                 g_show_form = true;
                 g_is_editing = false;
@@ -1358,12 +1521,15 @@ static void draw_academic_tab(struct nk_context *ctx) {
     else {
         // ATP Section
         if (!g_show_form) {
-            nk_layout_row_template_begin(ctx, 35);
-            nk_layout_row_template_push_dynamic(ctx);
-            nk_layout_row_template_push_static(ctx, 150);
-            nk_layout_row_template_end(ctx);
-
-            nk_spacing(ctx, 1);
+            if (screen_width < 400) {
+                nk_layout_row_dynamic(ctx, 35, 1);
+            } else {
+                nk_layout_row_template_begin(ctx, 35);
+                nk_layout_row_template_push_dynamic(ctx);
+                nk_layout_row_template_push_static(ctx, 150);
+                nk_layout_row_template_end(ctx);
+                nk_spacing(ctx, 1);
+            }
             if (nk_button_label(ctx, "+ TAMBAH ALUR (ATP)")) {
                 g_show_form = true;
                 g_is_editing = false;
@@ -1485,30 +1651,47 @@ static void draw_academic_tab(struct nk_context *ctx) {
 }
 
 // SUB-SCREEN: Daily Journal
-static void draw_journal_tab(struct nk_context *ctx) {
+static void draw_journal_tab(struct nk_context *ctx, int screen_width) {
     nk_layout_row_dynamic(ctx, 30, 1);
     nk_label_colored(ctx, "JURNAL HARIAN GURU & AKTIVITAS ROMBEL", NK_TEXT_LEFT, g_theme_text_header);
 
     if (!g_show_form) {
-        nk_layout_row_template_begin(ctx, 35);
-        nk_layout_row_template_push_static(ctx, 120); // Date filter
-        nk_layout_row_template_push_static(ctx, 80);  // Filter btn
-        nk_layout_row_template_push_dynamic(ctx);
-        nk_layout_row_template_push_static(ctx, 150); // Add btn
-        nk_layout_row_template_end(ctx);
+        if (screen_width < 450) {
+            nk_layout_row_dynamic(ctx, 35, 1);
+            nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_attendance_date, sizeof(g_attendance_date), nk_filter_ascii);
+            nk_layout_row_dynamic(ctx, 35, 2);
+            if (nk_button_label(ctx, "Filter")) load_tab_data(MENU_JOURNAL);
+            if (nk_button_label(ctx, "+ JURNAL")) {
+                g_show_form = true;
+                g_is_editing = false;
+                g_editing_id = 0;
+                g_form_txt1[0] = '\0'; // activity
+                g_form_txt2[0] = '\0'; // notes
+                g_form_int1 = 0;       // teacher idx
+                g_form_gender_idx = 0; // class idx
+                get_today_date(g_form_txt3, sizeof(g_form_txt3)); // date
+            }
+        } else {
+            nk_layout_row_template_begin(ctx, 35);
+            nk_layout_row_template_push_static(ctx, 120); // Date filter
+            nk_layout_row_template_push_static(ctx, 80);  // Filter btn
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_push_static(ctx, 150); // Add btn
+            nk_layout_row_template_end(ctx);
 
-        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_attendance_date, sizeof(g_attendance_date), nk_filter_ascii);
-        if (nk_button_label(ctx, "Filter")) load_tab_data(MENU_JOURNAL);
-        nk_spacing(ctx, 1);
-        if (nk_button_label(ctx, "+ BUAT JURNAL")) {
-            g_show_form = true;
-            g_is_editing = false;
-            g_editing_id = 0;
-            g_form_txt1[0] = '\0'; // activity
-            g_form_txt2[0] = '\0'; // notes
-            g_form_int1 = 0;       // teacher idx
-            g_form_gender_idx = 0; // class idx
-            get_today_date(g_form_txt3, sizeof(g_form_txt3)); // date
+            nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_attendance_date, sizeof(g_attendance_date), nk_filter_ascii);
+            if (nk_button_label(ctx, "Filter")) load_tab_data(MENU_JOURNAL);
+            nk_spacing(ctx, 1);
+            if (nk_button_label(ctx, "+ BUAT JURNAL")) {
+                g_show_form = true;
+                g_is_editing = false;
+                g_editing_id = 0;
+                g_form_txt1[0] = '\0'; // activity
+                g_form_txt2[0] = '\0'; // notes
+                g_form_int1 = 0;       // teacher idx
+                g_form_gender_idx = 0; // class idx
+                get_today_date(g_form_txt3, sizeof(g_form_txt3)); // date
+            }
         }
 
         nk_layout_row_dynamic(ctx, 15, 1);
@@ -1646,55 +1829,86 @@ static void draw_journal_tab(struct nk_context *ctx) {
 }
 
 // SUB-SCREEN: Grades Tab
-static void draw_grades_tab(struct nk_context *ctx) {
+static void draw_grades_tab(struct nk_context *ctx, int screen_width) {
     nk_layout_row_dynamic(ctx, 30, 1);
     nk_label_colored(ctx, "MANAJEMEN NILAI BELAJAR SISWA & TRANSKRIP", NK_TEXT_LEFT, g_theme_text_header);
 
-    // Choose Student and Load their specific grades
-    nk_layout_row_template_begin(ctx, 35);
-    nk_layout_row_template_push_static(ctx, 220); // Student select Combo
-    nk_layout_row_template_push_static(ctx, 80);  // Load btn
-    nk_layout_row_template_push_dynamic(ctx);     // Spacer
-    nk_layout_row_template_push_static(ctx, 130); // Export CSV
-    nk_layout_row_template_push_static(ctx, 130); // Export PDF
-    nk_layout_row_template_end(ctx);
-
-    const char *student_options[500];
-    for (int s = 0; s < g_students_count; s++) {
-        student_options[s] = g_students[s].name;
-    }
-    if (g_students_count > 0) {
-        g_selected_student_idx = nk_combo(ctx, student_options, g_students_count, g_selected_student_idx, 25, nk_vec2(220, 200));
-    } else {
-        nk_label(ctx, "Tidak ada Siswa!", NK_TEXT_LEFT);
-    }
-    
-    if (nk_button_label(ctx, "Tampilkan")) {
-        load_tab_data(MENU_GRADES);
-    }
-    
-    nk_spacing(ctx, 1);
-
-    if (nk_button_label(ctx, "Ekspor CSV")) {
+    // Choose Student and Load their specific grades - Responsive
+    if (screen_width < 650) {
+        nk_layout_row_dynamic(ctx, 35, 2);
+        const char *student_options[500];
+        for (int s = 0; s < g_students_count; s++) student_options[s] = g_students[s].name;
         if (g_students_count > 0) {
-            char filename[128];
-            snprintf(filename, sizeof(filename), "nilai_%s.csv", g_students[g_selected_student_idx].name);
-            if (service_export_grades_csv(filename, g_students[g_selected_student_idx].id, g_students[g_selected_student_idx].name)) {
-                show_notification("CSV Transkrip berhasil diekspor!", true);
-            } else {
-                show_notification("Gagal ekspor CSV!", false);
+            g_selected_student_idx = nk_combo(ctx, student_options, g_students_count, g_selected_student_idx, 25, nk_vec2(220, 200));
+        } else {
+            nk_label(ctx, "Tidak ada Siswa!", NK_TEXT_LEFT);
+        }
+        if (nk_button_label(ctx, "Tampilkan")) load_tab_data(MENU_GRADES);
+
+        nk_layout_row_dynamic(ctx, 35, 2);
+        if (nk_button_label(ctx, "CSV")) {
+            if (g_students_count > 0) {
+                char filename[128];
+                snprintf(filename, sizeof(filename), "nilai_%s.csv", g_students[g_selected_student_idx].name);
+                if (service_export_grades_csv(filename, g_students[g_selected_student_idx].id, g_students[g_selected_student_idx].name)) {
+                    show_notification("CSV Transkrip diekspor!", true);
+                } else {
+                    show_notification("Gagal ekspor CSV!", false);
+                }
             }
         }
-    }
+        if (nk_button_label(ctx, "PDF")) {
+            if (g_students_count > 0) {
+                char filename[128];
+                snprintf(filename, sizeof(filename), "nilai_%s.pdf", g_students[g_selected_student_idx].name);
+                if (service_export_grades_pdf(filename, g_students[g_selected_student_idx].id, g_students[g_selected_student_idx].name)) {
+                    show_notification("PDF Transkrip diekspor!", true);
+                } else {
+                    show_notification("Gagal ekspor PDF!", false);
+                }
+            }
+        }
+    } else {
+        nk_layout_row_template_begin(ctx, 35);
+        nk_layout_row_template_push_static(ctx, 220); // Student select Combo
+        nk_layout_row_template_push_static(ctx, 80);  // Load btn
+        nk_layout_row_template_push_dynamic(ctx);     // Spacer
+        nk_layout_row_template_push_static(ctx, 130); // Export CSV
+        nk_layout_row_template_push_static(ctx, 130); // Export PDF
+        nk_layout_row_template_end(ctx);
 
-    if (nk_button_label(ctx, "Ekspor PDF")) {
+        const char *student_options[500];
+        for (int s = 0; s < g_students_count; s++) student_options[s] = g_students[s].name;
         if (g_students_count > 0) {
-            char filename[128];
-            snprintf(filename, sizeof(filename), "nilai_%s.pdf", g_students[g_selected_student_idx].name);
-            if (service_export_grades_pdf(filename, g_students[g_selected_student_idx].id, g_students[g_selected_student_idx].name)) {
-                show_notification("PDF Transkrip berhasil diekspor!", true);
-            } else {
-                show_notification("Gagal ekspor PDF!", false);
+            g_selected_student_idx = nk_combo(ctx, student_options, g_students_count, g_selected_student_idx, 25, nk_vec2(220, 200));
+        } else {
+            nk_label(ctx, "Tidak ada Siswa!", NK_TEXT_LEFT);
+        }
+        if (nk_button_label(ctx, "Tampilkan")) load_tab_data(MENU_GRADES);
+        
+        nk_spacing(ctx, 1);
+
+        if (nk_button_label(ctx, "Ekspor CSV")) {
+            if (g_students_count > 0) {
+                char filename[128];
+                snprintf(filename, sizeof(filename), "nilai_%s.csv", g_students[g_selected_student_idx].name);
+                if (service_export_grades_csv(filename, g_students[g_selected_student_idx].id, g_students[g_selected_student_idx].name)) {
+                    show_notification("CSV Transkrip berhasil diekspor!", true);
+                } else {
+                    show_notification("Gagal ekspor CSV!", false);
+                }
+            }
+        }
+
+        if (nk_button_label(ctx, "Ekspor PDF")) {
+            if (g_students_count > 0) {
+                char filename[128];
+                snprintf(filename, sizeof(filename), "nilai_%s.pdf", g_students[g_selected_student_idx].name);
+                if (service_export_grades_pdf(filename, g_students[g_selected_student_idx].id, g_students[g_selected_student_idx].name)) {
+                    show_notification("PDF Transkrip berhasil diekspor!", true);
+                } else {
+                    show_notification("Gagal ekspor PDF!", false);
+                }
             }
         }
     }
@@ -1703,8 +1917,16 @@ static void draw_grades_tab(struct nk_context *ctx) {
 
     if (g_students_count == 0) return;
 
-    // Two-Column Grid: Left Column is Grade Entry Forms, Right Column is Grade Display Tables
-    nk_layout_row_dynamic(ctx, 350, 2);
+    // Two-Column Grid: Left Column is Grade Entry Forms, Right Column is Grade Display Tables - Responsive
+    int grid_cols = 2;
+    int group_height = 350;
+    if (screen_width < 750) {
+        grid_cols = 1;
+        group_height = 320;
+    }
+    
+    if (grid_cols == 1) nk_layout_row_dynamic(ctx, group_height, 1);
+    else nk_layout_row_dynamic(ctx, group_height, 2);
 
     // Left Column: Entry Form Group
     if (nk_group_begin(ctx, "InputGradesGroup", NK_WINDOW_BORDER)) {
@@ -1805,6 +2027,8 @@ static void draw_grades_tab(struct nk_context *ctx) {
         nk_group_end(ctx);
     }
 
+    if (grid_cols == 1) nk_layout_row_dynamic(ctx, group_height, 1);
+
     // Right Column: Display Tables Group
     if (nk_group_begin(ctx, "DisplayGradesGroup", NK_WINDOW_BORDER)) {
         nk_layout_row_dynamic(ctx, 20, 1);
@@ -1885,7 +2109,7 @@ static void draw_grades_tab(struct nk_context *ctx) {
 }
 
 // SUB-SCREEN: Users Tab (Admin Only)
-static void draw_users_tab(struct nk_context *ctx) {
+static void draw_users_tab(struct nk_context *ctx, int screen_width) {
     nk_layout_row_dynamic(ctx, 30, 1);
     nk_label_colored(ctx, "MANAJEMEN PENGGUNA APLIKASI (USERS)", NK_TEXT_LEFT, g_theme_text_header);
 
@@ -1896,12 +2120,15 @@ static void draw_users_tab(struct nk_context *ctx) {
     }
 
     if (!g_show_form) {
-        nk_layout_row_template_begin(ctx, 35);
-        nk_layout_row_template_push_dynamic(ctx);
-        nk_layout_row_template_push_static(ctx, 180);
-        nk_layout_row_template_end(ctx);
-
-        nk_spacing(ctx, 1);
+        if (screen_width < 400) {
+            nk_layout_row_dynamic(ctx, 35, 1);
+        } else {
+            nk_layout_row_template_begin(ctx, 35);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_push_static(ctx, 180);
+            nk_layout_row_template_end(ctx);
+            nk_spacing(ctx, 1);
+        }
         if (nk_button_label(ctx, "+ TAMBAH USER BARU")) {
             g_show_form = true;
             g_is_editing = false;
@@ -2019,13 +2246,21 @@ static void draw_users_tab(struct nk_context *ctx) {
 }
 
 // SUB-SCREEN: Backup & Restore
-static void draw_backup_tab(struct nk_context *ctx) {
+static void draw_backup_tab(struct nk_context *ctx, int screen_width) {
     nk_layout_row_dynamic(ctx, 30, 1);
     nk_label_colored(ctx, "BACKUP & RESTORE DATABASE SQLITE", NK_TEXT_LEFT, g_theme_text_header);
 
     nk_layout_row_dynamic(ctx, 20, 1); // Spacer
 
-    nk_layout_row_dynamic(ctx, 160, 2);
+    int backup_cols = 2;
+    int group_height = 160;
+    if (screen_width < 600) {
+        backup_cols = 1;
+        group_height = 150;
+    }
+
+    if (backup_cols == 1) nk_layout_row_dynamic(ctx, group_height, 1);
+    else nk_layout_row_dynamic(ctx, group_height, 2);
 
     // Backup Group
     if (nk_group_begin(ctx, "BackupGroup", NK_WINDOW_BORDER)) {
@@ -2050,6 +2285,8 @@ static void draw_backup_tab(struct nk_context *ctx) {
         nk_group_end(ctx);
     }
 
+    if (backup_cols == 1) nk_layout_row_dynamic(ctx, group_height, 1);
+
     // Restore Group
     if (nk_group_begin(ctx, "RestoreGroup", NK_WINDOW_BORDER)) {
         nk_layout_row_dynamic(ctx, 25, 1);
@@ -2073,6 +2310,22 @@ static void draw_backup_tab(struct nk_context *ctx) {
     }
 }
 
+// Footer Status Bar
+static void draw_footer(struct nk_context *ctx) {
+    if (nk_group_begin(ctx, "Footer", NK_WINDOW_NO_SCROLLBAR)) {
+        nk_layout_row_template_begin(ctx, 20);
+        nk_layout_row_template_push_static(ctx, 220); // System status
+        nk_layout_row_template_push_dynamic(ctx);     // Center info
+        nk_layout_row_template_push_static(ctx, 180); // Database path info
+        nk_layout_row_template_end(ctx);
+
+        nk_label_colored(ctx, "  Status: Terhubung (Offline Mode)", NK_TEXT_LEFT, nk_rgb(39, 174, 96));
+        nk_label_colored(ctx, "DangerPCA ERP v1.0.0-Stable", NK_TEXT_CENTERED, g_theme_text_muted);
+        nk_label(ctx, "DB: school_erp.db   ", NK_TEXT_RIGHT);
+        nk_group_end(ctx);
+    }
+}
+
 // Main Draw Dispatcher
 void ui_render(struct nk_context *ctx, int screen_width, int screen_height) {
     if (!g_logged_in) {
@@ -2085,13 +2338,13 @@ void ui_render(struct nk_context *ctx, int screen_width, int screen_height) {
     struct nk_rect full_bounds = nk_rect(0, 0, screen_width, screen_height);
     if (nk_begin(ctx, "DangerPCA_ERP", full_bounds, NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_BACKGROUND)) {
         
-        nk_layout_row_template_begin(ctx, screen_height - 10);
+        nk_layout_row_template_begin(ctx, screen_height - 35);
         nk_layout_row_template_push_static(ctx, 180); // Left Sidebar
         nk_layout_row_template_push_dynamic(ctx);     // Right Main Workspace
         nk_layout_row_template_end(ctx);
 
         // Column 1: Sidebar Navigation
-        draw_sidebar(ctx, screen_height);
+        draw_sidebar(ctx, screen_height - 35);
 
         // Column 2: Main Workspace Group
         if (nk_group_begin(ctx, "WorkspaceGroup", NK_WINDOW_NO_SCROLLBAR)) {
@@ -2099,24 +2352,28 @@ void ui_render(struct nk_context *ctx, int screen_width, int screen_height) {
             draw_topbar(ctx);
 
             nk_layout_row_dynamic(ctx, 10, 1); // Spacer
-            nk_layout_row_dynamic(ctx, screen_height - 85, 1);
+            nk_layout_row_dynamic(ctx, screen_height - 110, 1);
             if (nk_group_begin(ctx, "ContentPane", NK_WINDOW_BORDER)) {
                 switch (g_current_menu) {
-                    case MENU_DASHBOARD: draw_dashboard(ctx); break;
-                    case MENU_STUDENTS: draw_students_tab(ctx); break;
-                    case MENU_TEACHERS: draw_teachers_tab(ctx); break;
-                    case MENU_CLASSES: draw_classes_tab(ctx); break;
-                    case MENU_ATTENDANCE: draw_attendance_tab(ctx); break;
-                    case MENU_ACADEMIC: draw_academic_tab(ctx); break;
-                    case MENU_JOURNAL: draw_journal_tab(ctx); break;
-                    case MENU_GRADES: draw_grades_tab(ctx); break;
-                    case MENU_USERS: draw_users_tab(ctx); break;
-                    case MENU_BACKUP: draw_backup_tab(ctx); break;
+                    case MENU_DASHBOARD: draw_dashboard(ctx, screen_width); break;
+                    case MENU_STUDENTS: draw_students_tab(ctx, screen_width); break;
+                    case MENU_TEACHERS: draw_teachers_tab(ctx, screen_width); break;
+                    case MENU_CLASSES: draw_classes_tab(ctx, screen_width); break;
+                    case MENU_ATTENDANCE: draw_attendance_tab(ctx, screen_width); break;
+                    case MENU_ACADEMIC: draw_academic_tab(ctx, screen_width); break;
+                    case MENU_JOURNAL: draw_journal_tab(ctx, screen_width); break;
+                    case MENU_GRADES: draw_grades_tab(ctx, screen_width); break;
+                    case MENU_USERS: draw_users_tab(ctx, screen_width); break;
+                    case MENU_BACKUP: draw_backup_tab(ctx, screen_width); break;
                 }
                 nk_group_end(ctx);
             }
             nk_group_end(ctx);
         }
+
+        // Draw Footer Status Bar
+        nk_layout_row_dynamic(ctx, 25, 1);
+        draw_footer(ctx);
     }
     nk_end(ctx);
 
