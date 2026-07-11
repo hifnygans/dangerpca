@@ -1,1 +1,0 @@
-/usr/bin/cc -O3 -DNDEBUG CMakeFiles/dangerpca.dir/src/main.c.o CMakeFiles/dangerpca.dir/src/database/db.c.o CMakeFiles/dangerpca.dir/src/services/services.c.o CMakeFiles/dangerpca.dir/src/ui/ui.c.o CMakeFiles/dangerpca.dir/thirdparty/pdfgen.c.o -o dangerpca  -lSDL2 -lsqlite3 -lm -ldl -lpthread 

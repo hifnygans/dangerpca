@@ -1,0 +1,5 @@
+build/
+*.db
+*.csv
+*.pdf
+.DS_Store
