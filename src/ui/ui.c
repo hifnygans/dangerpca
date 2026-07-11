@@ -29,6 +29,8 @@
 #define ICON_EDIT        "\xef\x81\x84"
 #define ICON_TRASH       "\xef\x8b\xad"
 #define ICON_SEARCH      "\xef\x80\x82"
+#define ICON_USER_LOGIN  "\xef\x80\x87"
+#define ICON_LOCK_LOGIN  "\xef\x80\xa3"
 
 
 // Global State
@@ -300,31 +302,45 @@ static void draw_notification(struct nk_context *ctx, int screen_width) {
 
 // SUB-SCREEN: Login
 static void draw_login_screen(struct nk_context *ctx, int width, int height) {
-    struct nk_rect login_bounds = nk_rect(width / 2 - 175, height / 2 - 150, 350, 280);
-    if (nk_begin(ctx, "Login", login_bounds, NK_WINDOW_TITLE | NK_WINDOW_BORDER | NK_WINDOW_NO_SCROLLBAR)) {
-        nk_layout_row_dynamic(ctx, 30, 1);
-        nk_label(ctx, "DANGERPCA ERP SEKOLAH", NK_TEXT_CENTERED);
-        nk_label(ctx, "Silakan login untuk masuk ke dashboard.", NK_TEXT_CENTERED);
+    // Centered login card with responsive layout positioning
+    struct nk_rect login_bounds = nk_rect(width / 2 - 200, height / 2 - 210, 400, 420);
+    
+    // We omit NK_WINDOW_TITLE, NK_WINDOW_MOVABLE, and NK_WINDOW_SCALABLE to make it look like a clean floating card
+    if (nk_begin(ctx, "Login", login_bounds, NK_WINDOW_BORDER | NK_WINDOW_NO_SCROLLBAR)) {
         
-        nk_layout_row_dynamic(ctx, 10, 1); // Spacer
+        // 1. Hero Icon & Branding
+        nk_layout_row_dynamic(ctx, 15, 1); // Spacer
         
+        nk_layout_row_dynamic(ctx, 40, 1);
+        nk_label_colored(ctx, ICON_ACADEMIC "  DANGERPCA ERP", NK_TEXT_CENTERED, nk_rgb(33, 150, 243));
+        
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label_colored(ctx, "Sistem Informasi & Manajemen Sekolah", NK_TEXT_CENTERED, g_theme_text_muted);
+        
+        nk_layout_row_dynamic(ctx, 15, 1); // Spacer
+        nk_rule_horizontal(ctx, g_theme_border, 1);
+        nk_layout_row_dynamic(ctx, 15, 1); // Spacer
+        
+        // 2. Input Fields with Professional styling
         nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label(ctx, "Username", NK_TEXT_LEFT);
+        nk_label_colored(ctx, ICON_USER_LOGIN "  Username / NIP / NISN", NK_TEXT_LEFT, g_theme_text_header);
         
-        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_layout_row_dynamic(ctx, 35, 1);
         nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD | NK_EDIT_SIG_ENTER, g_login_user, sizeof(g_login_user), nk_filter_ascii);
-        
-        nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label(ctx, "Password", NK_TEXT_LEFT);
-        
-        nk_layout_row_dynamic(ctx, 30, 1);
-        // Nuklear uses a simple visual filter for password or we edit directly
-        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD | NK_EDIT_SIG_ENTER, g_login_pass, sizeof(g_login_pass), nk_filter_ascii);
         
         nk_layout_row_dynamic(ctx, 15, 1); // Spacer
         
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label_colored(ctx, ICON_LOCK_LOGIN "  Kata Sandi / Password", NK_TEXT_LEFT, g_theme_text_header);
+        
         nk_layout_row_dynamic(ctx, 35, 1);
-        if (nk_button_label(ctx, "LOGIN")) {
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD | NK_EDIT_SIG_ENTER, g_login_pass, sizeof(g_login_pass), nk_filter_ascii);
+        
+        nk_layout_row_dynamic(ctx, 30, 1); // Spacer
+        
+        // 3. Action Buttons & Feedback
+        nk_layout_row_dynamic(ctx, 42, 1);
+        if (nk_button_label(ctx, "MASUK KE DASHBOARD")) {
             User user;
             if (db_authenticate_user(g_login_user, g_login_pass, &user)) {
                 g_logged_in = true;
@@ -335,6 +351,11 @@ static void draw_login_screen(struct nk_context *ctx, int width, int height) {
                 show_notification("Username atau Password salah!", false);
             }
         }
+        
+        // 4. Subtle Footer inside card
+        nk_layout_row_dynamic(ctx, 25, 1); // Spacer
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label_colored(ctx, "v2.0-stable | Database: school_erp.db", NK_TEXT_CENTERED, g_theme_text_muted);
     }
     nk_end(ctx);
 }
