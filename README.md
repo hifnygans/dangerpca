@@ -6,6 +6,17 @@ Aplikasi ini udah **100% portable**, Ca! File font (Roboto) sama semua ikon kere
 
 ---
 
+## 📥 Cara Download Instan (Gak Perlu Build Sendiri, Ca!)
+
+Kalau Ica cuma pengen langsung pakai aplikasinya tanpa perlu ribet urusan coding atau compile, Ica bisa langsung download file installernya yang siap pakai:
+
+👉 **[Download Aplikasi (.exe / .deb) di Halaman Releases GitHub](https://github.com/hifnygans/dangerpca/releases/latest)**
+
+- **Pengguna Windows**: Cukup download `dangerpca-windows.exe`, tinggal double-click langsung bisa dipakai.
+- **Pengguna Linux (Ubuntu/Debian)**: Download file `.deb` (bisa double-click untuk langsung install ke sistem) atau download binary standalone `dangerpca-linux`.
+
+---
+
 ## 🔑 Kredensial Login (Jangan Lupa ya, Ca!)
 
 Pas pertama kali Ica buka aplikasi ini, database `school_erp.db` bakal otomatis dibuat secara ajaib. Nah, buat masuk ke dashboard-nya, Ica bisa login pakai akun admin default ini:
