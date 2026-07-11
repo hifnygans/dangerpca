@@ -76,26 +76,44 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    // 6. Load TrueType Font (Roboto) with robust path fallback
+    // 6. Load TrueType Font (Roboto & FontAwesome) with robust path fallback
     struct nk_font_atlas *atlas;
     nk_sdl_font_stash_begin(&atlas);
     
     struct nk_font *roboto = NULL;
+    struct nk_font_config cfg = nk_font_config(15);
+    static const nk_rune fa_range[] = {0xf000, 0xf900, 0};
+    struct nk_font_config fa_cfg = nk_font_config(14);
+    fa_cfg.merge_mode = nk_true;
+    fa_cfg.range = fa_range;
+
     // Fallback 1: Local assets folder (current working directory)
-    roboto = nk_font_atlas_add_from_file(atlas, "assets/Roboto-Regular.ttf", 15, NULL);
+    roboto = nk_font_atlas_add_from_file(atlas, "assets/Roboto-Regular.ttf", 15, &cfg);
+    if (roboto) {
+        nk_font_atlas_add_from_file(atlas, "assets/fa-solid-900.ttf", 14, &fa_cfg);
+    }
     
     // Fallback 2: Executable relative path
     if (!roboto) {
         char *base_path = SDL_GetBasePath();
         if (base_path) {
             char font_path[512];
+            char fa_path[512];
             snprintf(font_path, sizeof(font_path), "%sassets/Roboto-Regular.ttf", base_path);
-            roboto = nk_font_atlas_add_from_file(atlas, font_path, 15, NULL);
+            roboto = nk_font_atlas_add_from_file(atlas, font_path, 15, &cfg);
+            if (roboto) {
+                snprintf(fa_path, sizeof(fa_path), "%sassets/fa-solid-900.ttf", base_path);
+                nk_font_atlas_add_from_file(atlas, fa_path, 14, &fa_cfg);
+            }
             
             // Fallback 3: Installed Debian path (relative to /usr/bin)
             if (!roboto) {
                 snprintf(font_path, sizeof(font_path), "%s../share/dangerpca/assets/Roboto-Regular.ttf", base_path);
-                roboto = nk_font_atlas_add_from_file(atlas, font_path, 15, NULL);
+                roboto = nk_font_atlas_add_from_file(atlas, font_path, 15, &cfg);
+                if (roboto) {
+                    snprintf(fa_path, sizeof(fa_path), "%s../share/dangerpca/assets/fa-solid-900.ttf", base_path);
+                    nk_font_atlas_add_from_file(atlas, fa_path, 14, &fa_cfg);
+                }
             }
             SDL_free(base_path);
         }
@@ -103,7 +121,10 @@ int main(int argc, char *argv[]) {
     
     // Fallback 4: Absolute Linux installation directory
     if (!roboto) {
-        roboto = nk_font_atlas_add_from_file(atlas, "/usr/share/dangerpca/assets/Roboto-Regular.ttf", 15, NULL);
+        roboto = nk_font_atlas_add_from_file(atlas, "/usr/share/dangerpca/assets/Roboto-Regular.ttf", 15, &cfg);
+        if (roboto) {
+            nk_font_atlas_add_from_file(atlas, "/usr/share/dangerpca/assets/fa-solid-900.ttf", 14, &fa_cfg);
+        }
     }
 
     nk_sdl_font_stash_end();

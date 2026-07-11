@@ -13,6 +13,24 @@
 #include <stdlib.h>
 #include <time.h>
 
+// FontAwesome solid icons macros in UTF-8
+#define ICON_DASHBOARD   "\xef\x83\xa4"
+#define ICON_STUDENTS    "\xef\x83\x80"
+#define ICON_TEACHERS    "\xef\x94\x9b"
+#define ICON_CLASSES     "\xef\x95\x89"
+#define ICON_ATTENDANCE  "\xef\x89\xb2"
+#define ICON_ACADEMIC    "\xef\x95\x92"
+#define ICON_JOURNAL     "\xef\x81\x84"
+#define ICON_GRADES      "\xef\x97\x80"
+#define ICON_USERS       "\xef\x93\xbe"
+#define ICON_BACKUP      "\xef\x87\x80"
+#define ICON_LOGOUT      "\xef\x8b\xb5"
+#define ICON_THEME       "\xef\x81\x82"
+#define ICON_EDIT        "\xef\x81\x84"
+#define ICON_TRASH       "\xef\x8b\xad"
+#define ICON_SEARCH      "\xef\x80\x82"
+
+
 // Global State
 static SidebarMenu g_current_menu = MENU_DASHBOARD;
 static bool g_logged_in = false;
@@ -331,9 +349,16 @@ static void draw_sidebar(struct nk_context *ctx, int height) {
         nk_layout_row_dynamic(ctx, 10, 1); // Spacer
 
         const char *menus[] = {
-            "Dashboard", "Data Murid", "Data Guru", "Data Kelas",
-            "Absensi Harian", "Capaian CP/TP", "Jurnal Harian",
-            "Nilai & Transkrip", "Pengguna", "Backup & Restore"
+            ICON_DASHBOARD "   Dashboard",
+            ICON_STUDENTS "   Data Murid",
+            ICON_TEACHERS "   Data Guru",
+            ICON_CLASSES "   Data Kelas",
+            ICON_ATTENDANCE "   Absensi Harian",
+            ICON_ACADEMIC "   Capaian CP/TP",
+            ICON_JOURNAL "   Jurnal Harian",
+            ICON_GRADES "   Nilai & Transkrip",
+            ICON_USERS "   Pengguna",
+            ICON_BACKUP "   Backup & Restore"
         };
         SidebarMenu mapping[] = {
             MENU_DASHBOARD, MENU_STUDENTS, MENU_TEACHERS, MENU_CLASSES,
@@ -342,6 +367,7 @@ static void draw_sidebar(struct nk_context *ctx, int height) {
         };
 
         for (int i = 0; i < 10; i++) {
+            nk_layout_row_dynamic(ctx, 38, 1);
             if (g_current_menu == mapping[i]) {
                 // Highlight active button (indigo in light mode, sky-blue in dark mode)
                 ctx->style.button.normal.data.color = g_light_mode ? nk_rgb(63, 81, 181) : nk_rgb(30, 136, 229);
@@ -364,6 +390,9 @@ static void draw_sidebar(struct nk_context *ctx, int height) {
                 g_current_menu = mapping[i];
                 load_tab_data(g_current_menu);
             }
+            // Add a small spacing spacer row
+            nk_layout_row_dynamic(ctx, 4, 1);
+            nk_spacing(ctx, 1);
         }
         
         // Reset style configurations back to default active theme
@@ -379,8 +408,8 @@ static void draw_topbar(struct nk_context *ctx) {
         nk_layout_row_template_begin(ctx, 30);
         nk_layout_row_template_push_static(ctx, 120); // Role tag
         nk_layout_row_template_push_dynamic(ctx);     // Welcome message
-        nk_layout_row_template_push_static(ctx, 130); // Theme Switcher Button
-        nk_layout_row_template_push_static(ctx, 100); // Logout Button
+        nk_layout_row_template_push_static(ctx, 150); // Theme Switcher Button (increased width slightly)
+        nk_layout_row_template_push_static(ctx, 110); // Logout Button
         nk_layout_row_template_end(ctx);
 
         const char *role_str = "ADMINISTRATOR";
@@ -395,13 +424,14 @@ static void draw_topbar(struct nk_context *ctx) {
         snprintf(welcome, sizeof(welcome), "Selamat Bekerja, %s", g_current_user.name);
         nk_label(ctx, welcome, NK_TEXT_LEFT);
 
-        const char *theme_btn_label = g_light_mode ? "MODE GELAP" : "MODE TERANG";
+        char theme_btn_label[64];
+        snprintf(theme_btn_label, sizeof(theme_btn_label), ICON_THEME "  %s", g_light_mode ? "MODE GELAP" : "MODE TERANG");
         if (nk_button_label(ctx, theme_btn_label)) {
             g_light_mode = !g_light_mode;
             ui_apply_theme(ctx);
         }
 
-        if (nk_button_label(ctx, "LOGOUT")) {
+        if (nk_button_label(ctx, ICON_LOGOUT "  LOGOUT")) {
             g_logged_in = false;
             memset(&g_current_user, 0, sizeof(g_current_user));
             memset(g_login_user, 0, sizeof(g_login_user));
@@ -415,7 +445,7 @@ static void draw_topbar(struct nk_context *ctx) {
 // SUB-SCREEN: Dashboard
 static void draw_dashboard(struct nk_context *ctx, int screen_width) {
     nk_layout_row_dynamic(ctx, 30, 1);
-    nk_label_colored(ctx, "DASHBOARD MONITORING SEKOLAH", NK_TEXT_LEFT, g_theme_text_header);
+    nk_label_colored(ctx, ICON_DASHBOARD "   DASHBOARD MONITORING SEKOLAH", NK_TEXT_LEFT, g_theme_text_header);
 
     // Stats Grid - Responsive columns
     int stats_cols = 4;
@@ -426,10 +456,10 @@ static void draw_dashboard(struct nk_context *ctx, int screen_width) {
     // Card 1: Total Students
     if (nk_group_begin(ctx, "CardSiswa", NK_WINDOW_BORDER)) {
         nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label_colored(ctx, "TOTAL SISWA AKTIF", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, ICON_STUDENTS "  TOTAL SISWA AKTIF", NK_TEXT_LEFT, g_theme_text_muted);
         nk_layout_row_dynamic(ctx, 40, 1);
         char buf[50];
-        snprintf(buf, sizeof(buf), "%d Siswa", g_stats.total_students);
+        snprintf(buf, sizeof(buf), "   %d Siswa", g_stats.total_students);
         nk_label_colored(ctx, buf, NK_TEXT_LEFT, nk_rgb(46, 204, 113));
         nk_group_end(ctx);
     }
@@ -437,10 +467,10 @@ static void draw_dashboard(struct nk_context *ctx, int screen_width) {
     // Card 2: Total Teachers
     if (nk_group_begin(ctx, "CardGuru", NK_WINDOW_BORDER)) {
         nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label_colored(ctx, "TOTAL GURU", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, ICON_TEACHERS "  TOTAL GURU", NK_TEXT_LEFT, g_theme_text_muted);
         nk_layout_row_dynamic(ctx, 40, 1);
         char buf[50];
-        snprintf(buf, sizeof(buf), "%d Guru", g_stats.total_teachers);
+        snprintf(buf, sizeof(buf), "   %d Guru", g_stats.total_teachers);
         nk_label_colored(ctx, buf, NK_TEXT_LEFT, nk_rgb(52, 152, 219));
         nk_group_end(ctx);
     }
@@ -448,10 +478,10 @@ static void draw_dashboard(struct nk_context *ctx, int screen_width) {
     // Card 3: Total Classes
     if (nk_group_begin(ctx, "CardKelas", NK_WINDOW_BORDER)) {
         nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label_colored(ctx, "TOTAL KELAS", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, ICON_CLASSES "  TOTAL KELAS", NK_TEXT_LEFT, g_theme_text_muted);
         nk_layout_row_dynamic(ctx, 40, 1);
         char buf[50];
-        snprintf(buf, sizeof(buf), "%d Rombel", g_stats.total_classes);
+        snprintf(buf, sizeof(buf), "   %d Rombel", g_stats.total_classes);
         nk_label_colored(ctx, buf, NK_TEXT_LEFT, nk_rgb(241, 196, 15));
         nk_group_end(ctx);
     }
@@ -459,10 +489,10 @@ static void draw_dashboard(struct nk_context *ctx, int screen_width) {
     // Card 4: Attendance Today
     if (nk_group_begin(ctx, "CardAttendance", NK_WINDOW_BORDER)) {
         nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label_colored(ctx, "KEHADIRAN HARI INI", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, ICON_ATTENDANCE "  KEHADIRAN HARI INI", NK_TEXT_LEFT, g_theme_text_muted);
         nk_layout_row_dynamic(ctx, 40, 1);
         char buf[50];
-        snprintf(buf, sizeof(buf), "%.1f %%", g_stats.attendance_rate_today);
+        snprintf(buf, sizeof(buf), "   %.1f %%", g_stats.attendance_rate_today);
         nk_label_colored(ctx, buf, NK_TEXT_LEFT, nk_rgb(155, 89, 182));
         nk_group_end(ctx);
     }
@@ -489,12 +519,12 @@ static void draw_dashboard(struct nk_context *ctx, int screen_width) {
         nk_layout_row_dynamic(ctx, 24, 1);
         nk_label(ctx, "Fitur-fitur utama yang tersedia:", NK_TEXT_LEFT);
         
-        nk_layout_row_dynamic(ctx, 20, 1);
-        nk_label(ctx, " - Manajemen data Murid, Guru, dan Rombongan Belajar (Kelas).", NK_TEXT_LEFT);
-        nk_label(ctx, " - Pencatatan Kehadiran (Absensi) harian terintegrasi ekspor laporan.", NK_TEXT_LEFT);
-        nk_label(ctx, " - Kurikulum: Capaian Pembelajaran (CP), Tujuan Pembelajaran (TP) & ATP.", NK_TEXT_LEFT);
-        nk_label(ctx, " - Evaluasi Belajar: Nilai Harian format TP & Ujian Akhir (UTS/UAS).", NK_TEXT_LEFT);
-        nk_label(ctx, " - Database & Keamanan: Ekspor laporan PDF & CSV (Excel) serta backup instan.", NK_TEXT_LEFT);
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label(ctx, "  " ICON_STUDENTS "   Manajemen data Murid, Guru, dan Rombongan Belajar (Kelas).", NK_TEXT_LEFT);
+        nk_label(ctx, "  " ICON_ATTENDANCE "   Pencatatan Kehadiran (Absensi) harian terintegrasi ekspor laporan.", NK_TEXT_LEFT);
+        nk_label(ctx, "  " ICON_ACADEMIC "   Kurikulum: Capaian Pembelajaran (CP), Tujuan Pembelajaran (TP) & ATP.", NK_TEXT_LEFT);
+        nk_label(ctx, "  " ICON_GRADES "   Evaluasi Belajar: Nilai Harian format TP & Ujian Akhir (UTS/UAS).", NK_TEXT_LEFT);
+        nk_label(ctx, "  " ICON_BACKUP "   Database & Keamanan: Ekspor laporan PDF & CSV (Excel) serta backup instan.", NK_TEXT_LEFT);
         nk_group_end(ctx);
     }
 }
@@ -604,13 +634,13 @@ static void draw_students_tab(struct nk_context *ctx, int screen_width) {
         nk_rule_horizontal(ctx, g_theme_border, 1);
 
         for (int i = 0; i < g_students_count; i++) {
-            nk_layout_row_template_begin(ctx, 30);
+            nk_layout_row_template_begin(ctx, 35); // increased height to 35 for better padding
             nk_layout_row_template_push_static(ctx, 80);
             nk_layout_row_template_push_dynamic(ctx);
             nk_layout_row_template_push_static(ctx, 80);
             nk_layout_row_template_push_static(ctx, 50);
             nk_layout_row_template_push_static(ctx, 80);
-            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_push_static(ctx, 160); // increased width slightly for icon buttons
             nk_layout_row_template_end(ctx);
 
             nk_label(ctx, g_students[i].nisn, NK_TEXT_LEFT);
@@ -619,38 +649,43 @@ static void draw_students_tab(struct nk_context *ctx, int screen_width) {
             nk_label(ctx, g_students[i].gender, NK_TEXT_LEFT);
             nk_label(ctx, g_students[i].status, NK_TEXT_LEFT);
 
-            // Edit / Delete Buttons
-            nk_layout_row_dynamic(ctx, 22, 2);
-            if (nk_button_label(ctx, "Edit")) {
-                g_show_form = true;
-                g_is_editing = true;
-                g_editing_id = g_students[i].id;
-                strncpy(g_form_txt1, g_students[i].nisn, sizeof(g_form_txt1) - 1);
-                strncpy(g_form_txt2, g_students[i].name, sizeof(g_form_txt2) - 1);
-                strncpy(g_form_txt3, g_students[i].dob, sizeof(g_form_txt3) - 1);
-                strncpy(g_form_txt4, g_students[i].address, sizeof(g_form_txt4) - 1);
-                
-                g_form_gender_idx = (strcmp(g_students[i].gender, "L") == 0) ? 0 : 1;
-                
-                if (strcmp(g_students[i].status, "Aktif") == 0) g_form_status_idx = 0;
-                else if (strcmp(g_students[i].status, "Lulus") == 0) g_form_status_idx = 1;
-                else g_form_status_idx = 2;
+            // Edit / Delete Buttons inside group cell
+            char act_grp[64];
+            snprintf(act_grp, sizeof(act_grp), "std_act_%d", g_students[i].id);
+            if (nk_group_begin(ctx, act_grp, NK_WINDOW_NO_SCROLLBAR)) {
+                nk_layout_row_dynamic(ctx, 25, 2);
+                if (nk_button_label(ctx, ICON_EDIT " Edit")) {
+                    g_show_form = true;
+                    g_is_editing = true;
+                    g_editing_id = g_students[i].id;
+                    strncpy(g_form_txt1, g_students[i].nisn, sizeof(g_form_txt1) - 1);
+                    strncpy(g_form_txt2, g_students[i].name, sizeof(g_form_txt2) - 1);
+                    strncpy(g_form_txt3, g_students[i].dob, sizeof(g_form_txt3) - 1);
+                    strncpy(g_form_txt4, g_students[i].address, sizeof(g_form_txt4) - 1);
+                    
+                    g_form_gender_idx = (strcmp(g_students[i].gender, "L") == 0) ? 0 : 1;
+                    
+                    if (strcmp(g_students[i].status, "Aktif") == 0) g_form_status_idx = 0;
+                    else if (strcmp(g_students[i].status, "Lulus") == 0) g_form_status_idx = 1;
+                    else g_form_status_idx = 2;
 
-                g_form_int1 = 0;
-                for (int c = 0; c < g_classes_count; c++) {
-                    if (g_classes[c].id == g_students[i].class_id) {
-                        g_form_int1 = c + 1; // 0 index represents "No class"
-                        break;
+                    g_form_int1 = 0;
+                    for (int c = 0; c < g_classes_count; c++) {
+                        if (g_classes[c].id == g_students[i].class_id) {
+                            g_form_int1 = c + 1; // 0 index represents "No class"
+                            break;
+                        }
                     }
                 }
-            }
-            if (nk_button_label(ctx, "Hapus")) {
-                if (db_delete_student(g_students[i].id)) {
-                    show_notification("Data murid berhasil dihapus.", true);
-                    load_tab_data(MENU_STUDENTS);
-                } else {
-                    show_notification("Gagal menghapus data murid!", false);
+                if (nk_button_label(ctx, ICON_TRASH " Hapus")) {
+                    if (db_delete_student(g_students[i].id)) {
+                        show_notification("Data murid berhasil dihapus.", true);
+                        load_tab_data(MENU_STUDENTS);
+                    } else {
+                        show_notification("Gagal menghapus data murid!", false);
+                    }
                 }
+                nk_group_end(ctx);
             }
         }
     } else {
@@ -835,13 +870,13 @@ static void draw_teachers_tab(struct nk_context *ctx, int screen_width) {
         nk_rule_horizontal(ctx, g_theme_border, 1);
 
         for (int i = 0; i < g_teachers_count; i++) {
-            nk_layout_row_template_begin(ctx, 30);
+            nk_layout_row_template_begin(ctx, 35); // increased height to 35 for better padding
             nk_layout_row_template_push_static(ctx, 120);
             nk_layout_row_template_push_dynamic(ctx);
             nk_layout_row_template_push_static(ctx, 50);
             nk_layout_row_template_push_static(ctx, 120);
             nk_layout_row_template_push_static(ctx, 80);
-            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_push_static(ctx, 160); // increased width slightly for icon buttons
             nk_layout_row_template_end(ctx);
 
             nk_label(ctx, g_teachers[i].nip, NK_TEXT_LEFT);
@@ -850,26 +885,31 @@ static void draw_teachers_tab(struct nk_context *ctx, int screen_width) {
             nk_label(ctx, g_teachers[i].subject, NK_TEXT_LEFT);
             nk_label(ctx, g_teachers[i].status, NK_TEXT_LEFT);
 
-            // Edit / Delete Buttons
-            nk_layout_row_dynamic(ctx, 22, 2);
-            if (nk_button_label(ctx, "Edit")) {
-                g_show_form = true;
-                g_is_editing = true;
-                g_editing_id = g_teachers[i].id;
-                strncpy(g_form_txt1, g_teachers[i].nip, sizeof(g_form_txt1) - 1);
-                strncpy(g_form_txt2, g_teachers[i].name, sizeof(g_form_txt2) - 1);
-                strncpy(g_form_txt3, g_teachers[i].subject, sizeof(g_form_txt3) - 1);
-                strncpy(g_form_txt4, g_teachers[i].phone, sizeof(g_form_txt4) - 1);
-                g_form_gender_idx = (strcmp(g_teachers[i].gender, "L") == 0) ? 0 : 1;
-                g_form_status_idx = (strcmp(g_teachers[i].status, "Aktif") == 0) ? 0 : (strcmp(g_teachers[i].status, "Cuti") == 0 ? 1 : 2);
-            }
-            if (nk_button_label(ctx, "Hapus")) {
-                if (db_delete_teacher(g_teachers[i].id)) {
-                    show_notification("Data guru berhasil dihapus.", true);
-                    load_tab_data(MENU_TEACHERS);
-                } else {
-                    show_notification("Gagal menghapus data guru!", false);
+            // Edit / Delete Buttons inside group cell
+            char act_grp[64];
+            snprintf(act_grp, sizeof(act_grp), "tch_act_%d", g_teachers[i].id);
+            if (nk_group_begin(ctx, act_grp, NK_WINDOW_NO_SCROLLBAR)) {
+                nk_layout_row_dynamic(ctx, 25, 2);
+                if (nk_button_label(ctx, ICON_EDIT " Edit")) {
+                    g_show_form = true;
+                    g_is_editing = true;
+                    g_editing_id = g_teachers[i].id;
+                    strncpy(g_form_txt1, g_teachers[i].nip, sizeof(g_form_txt1) - 1);
+                    strncpy(g_form_txt2, g_teachers[i].name, sizeof(g_form_txt2) - 1);
+                    strncpy(g_form_txt3, g_teachers[i].subject, sizeof(g_form_txt3) - 1);
+                    strncpy(g_form_txt4, g_teachers[i].phone, sizeof(g_form_txt4) - 1);
+                    g_form_gender_idx = (strcmp(g_teachers[i].gender, "L") == 0) ? 0 : 1;
+                    g_form_status_idx = (strcmp(g_teachers[i].status, "Aktif") == 0) ? 0 : (strcmp(g_teachers[i].status, "Cuti") == 0 ? 1 : 2);
                 }
+                if (nk_button_label(ctx, ICON_TRASH " Hapus")) {
+                    if (db_delete_teacher(g_teachers[i].id)) {
+                        show_notification("Data guru berhasil dihapus.", true);
+                        load_tab_data(MENU_TEACHERS);
+                    } else {
+                        show_notification("Gagal menghapus data guru!", false);
+                    }
+                }
+                nk_group_end(ctx);
             }
         }
     } else {
@@ -984,40 +1024,46 @@ static void draw_classes_tab(struct nk_context *ctx, int screen_width) {
         nk_rule_horizontal(ctx, g_theme_border, 1);
 
         for (int i = 0; i < g_classes_count; i++) {
-            nk_layout_row_template_begin(ctx, 30);
+            nk_layout_row_template_begin(ctx, 35); // increased height to 35
             nk_layout_row_template_push_static(ctx, 150);
             nk_layout_row_template_push_static(ctx, 120);
             nk_layout_row_template_push_dynamic(ctx);
-            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_push_static(ctx, 160); // increased width for action buttons
             nk_layout_row_template_end(ctx);
 
             nk_label(ctx, g_classes[i].name, NK_TEXT_LEFT);
             nk_label(ctx, g_classes[i].academic_year, NK_TEXT_LEFT);
             nk_label(ctx, g_classes[i].teacher_name, NK_TEXT_LEFT);
 
-            nk_layout_row_dynamic(ctx, 22, 2);
-            if (nk_button_label(ctx, "Edit")) {
-                g_show_form = true;
-                g_is_editing = true;
-                g_editing_id = g_classes[i].id;
-                strncpy(g_form_txt1, g_classes[i].name, sizeof(g_form_txt1) - 1);
-                strncpy(g_form_txt2, g_classes[i].academic_year, sizeof(g_form_txt2) - 1);
-                
-                g_form_int1 = 0; // "Belum Ditentukan"
-                for (int t = 0; t < g_teachers_count; t++) {
-                    if (g_teachers[t].id == g_classes[i].teacher_id) {
-                        g_form_int1 = t + 1;
-                        break;
+            // Edit / Delete Buttons inside group cell
+            char act_grp[64];
+            snprintf(act_grp, sizeof(act_grp), "cls_act_%d", g_classes[i].id);
+            if (nk_group_begin(ctx, act_grp, NK_WINDOW_NO_SCROLLBAR)) {
+                nk_layout_row_dynamic(ctx, 25, 2);
+                if (nk_button_label(ctx, ICON_EDIT " Edit")) {
+                    g_show_form = true;
+                    g_is_editing = true;
+                    g_editing_id = g_classes[i].id;
+                    strncpy(g_form_txt1, g_classes[i].name, sizeof(g_form_txt1) - 1);
+                    strncpy(g_form_txt2, g_classes[i].academic_year, sizeof(g_form_txt2) - 1);
+                    
+                    g_form_int1 = 0; // "Belum Ditentukan"
+                    for (int t = 0; t < g_teachers_count; t++) {
+                        if (g_teachers[t].id == g_classes[i].teacher_id) {
+                            g_form_int1 = t + 1;
+                            break;
+                        }
                     }
                 }
-            }
-            if (nk_button_label(ctx, "Hapus")) {
-                if (db_delete_class(g_classes[i].id)) {
-                    show_notification("Data kelas berhasil dihapus.", true);
-                    load_tab_data(MENU_CLASSES);
-                } else {
-                    show_notification("Gagal menghapus kelas!", false);
+                if (nk_button_label(ctx, ICON_TRASH " Hapus")) {
+                    if (db_delete_class(g_classes[i].id)) {
+                        show_notification("Data kelas berhasil dihapus.", true);
+                        load_tab_data(MENU_CLASSES);
+                    } else {
+                        show_notification("Gagal menghapus kelas!", false);
+                    }
                 }
+                nk_group_end(ctx);
             }
         }
     } else {
@@ -1321,29 +1367,35 @@ static void draw_academic_tab(struct nk_context *ctx, int screen_width) {
                 nk_layout_row_template_push_static(ctx, 100);
                 nk_layout_row_template_push_static(ctx, 150);
                 nk_layout_row_template_push_dynamic(ctx);
-                nk_layout_row_template_push_static(ctx, 120);
+                nk_layout_row_template_push_static(ctx, 160); // increased for icons
                 nk_layout_row_template_end(ctx);
 
                 nk_label(ctx, g_cp[i].code, NK_TEXT_LEFT);
                 nk_label(ctx, g_cp[i].subject, NK_TEXT_LEFT);
                 nk_label(ctx, g_cp[i].description, NK_TEXT_LEFT);
 
-                nk_layout_row_dynamic(ctx, 22, 2);
-                if (nk_button_label(ctx, "Edit")) {
-                    g_show_form = true;
-                    g_is_editing = true;
-                    g_editing_id = g_cp[i].id;
-                    strncpy(g_form_txt1, g_cp[i].code, sizeof(g_form_txt1) - 1);
-                    strncpy(g_form_txt2, g_cp[i].subject, sizeof(g_form_txt2) - 1);
-                    strncpy(g_form_txt3, g_cp[i].description, sizeof(g_form_txt3) - 1);
-                }
-                if (nk_button_label(ctx, "Hapus")) {
-                    if (db_delete_cp(g_cp[i].id)) {
-                        show_notification("CP berhasil dihapus.", true);
-                        load_tab_data(MENU_ACADEMIC);
-                    } else {
-                        show_notification("Gagal menghapus CP!", false);
+                // Action Buttons inside group cell
+                char act_grp[64];
+                snprintf(act_grp, sizeof(act_grp), "cp_act_%d", g_cp[i].id);
+                if (nk_group_begin(ctx, act_grp, NK_WINDOW_NO_SCROLLBAR)) {
+                    nk_layout_row_dynamic(ctx, 25, 2);
+                    if (nk_button_label(ctx, ICON_EDIT " Edit")) {
+                        g_show_form = true;
+                        g_is_editing = true;
+                        g_editing_id = g_cp[i].id;
+                        strncpy(g_form_txt1, g_cp[i].code, sizeof(g_form_txt1) - 1);
+                        strncpy(g_form_txt2, g_cp[i].subject, sizeof(g_form_txt2) - 1);
+                        strncpy(g_form_txt3, g_cp[i].description, sizeof(g_form_txt3) - 1);
                     }
+                    if (nk_button_label(ctx, ICON_TRASH " Hapus")) {
+                        if (db_delete_cp(g_cp[i].id)) {
+                            show_notification("CP berhasil dihapus.", true);
+                            load_tab_data(MENU_ACADEMIC);
+                        } else {
+                            show_notification("Gagal menghapus CP!", false);
+                        }
+                    }
+                    nk_group_end(ctx);
                 }
             }
         } else {
@@ -1434,36 +1486,42 @@ static void draw_academic_tab(struct nk_context *ctx, int screen_width) {
                 nk_layout_row_template_push_static(ctx, 100);
                 nk_layout_row_template_push_static(ctx, 100);
                 nk_layout_row_template_push_dynamic(ctx);
-                nk_layout_row_template_push_static(ctx, 120);
+                nk_layout_row_template_push_static(ctx, 160); // increased for icons
                 nk_layout_row_template_end(ctx);
 
                 nk_label(ctx, g_tp[i].code, NK_TEXT_LEFT);
                 nk_label(ctx, g_tp[i].cp_code, NK_TEXT_LEFT);
                 nk_label(ctx, g_tp[i].description, NK_TEXT_LEFT);
 
-                nk_layout_row_dynamic(ctx, 22, 2);
-                if (nk_button_label(ctx, "Edit")) {
-                    g_show_form = true;
-                    g_is_editing = true;
-                    g_editing_id = g_tp[i].id;
-                    strncpy(g_form_txt1, g_tp[i].code, sizeof(g_form_txt1) - 1);
-                    strncpy(g_form_txt2, g_tp[i].description, sizeof(g_form_txt2) - 1);
-                    
-                    g_form_int1 = 0;
-                    for (int cp = 0; cp < g_cp_count; cp++) {
-                        if (g_cp[cp].id == g_tp[i].cp_id) {
-                            g_form_int1 = cp;
-                            break;
+                // Action Buttons inside group cell
+                char act_grp[64];
+                snprintf(act_grp, sizeof(act_grp), "tp_act_%d", g_tp[i].id);
+                if (nk_group_begin(ctx, act_grp, NK_WINDOW_NO_SCROLLBAR)) {
+                    nk_layout_row_dynamic(ctx, 25, 2);
+                    if (nk_button_label(ctx, ICON_EDIT " Edit")) {
+                        g_show_form = true;
+                        g_is_editing = true;
+                        g_editing_id = g_tp[i].id;
+                        strncpy(g_form_txt1, g_tp[i].code, sizeof(g_form_txt1) - 1);
+                        strncpy(g_form_txt2, g_tp[i].description, sizeof(g_form_txt2) - 1);
+                        
+                        g_form_int1 = 0;
+                        for (int cp = 0; cp < g_cp_count; cp++) {
+                            if (g_cp[cp].id == g_tp[i].cp_id) {
+                                g_form_int1 = cp;
+                                break;
+                            }
                         }
                     }
-                }
-                if (nk_button_label(ctx, "Hapus")) {
-                    if (db_delete_tp(g_tp[i].id)) {
-                        show_notification("TP berhasil dihapus.", true);
-                        load_tab_data(MENU_ACADEMIC);
-                    } else {
-                        show_notification("Gagal menghapus TP!", false);
+                    if (nk_button_label(ctx, ICON_TRASH " Hapus")) {
+                        if (db_delete_tp(g_tp[i].id)) {
+                            show_notification("TP berhasil dihapus.", true);
+                            load_tab_data(MENU_ACADEMIC);
+                        } else {
+                            show_notification("Gagal menghapus TP!", false);
+                        }
                     }
+                    nk_group_end(ctx);
                 }
             }
         } else {
@@ -1561,7 +1619,7 @@ static void draw_academic_tab(struct nk_context *ctx, int screen_width) {
                 nk_layout_row_template_push_static(ctx, 80);
                 nk_layout_row_template_push_static(ctx, 100);
                 nk_layout_row_template_push_dynamic(ctx);
-                nk_layout_row_template_push_static(ctx, 120);
+                nk_layout_row_template_push_static(ctx, 160); // increased for icons
                 nk_layout_row_template_end(ctx);
 
                 char ord_str[20];
@@ -1570,29 +1628,35 @@ static void draw_academic_tab(struct nk_context *ctx, int screen_width) {
                 nk_label(ctx, g_atp[i].tp_code, NK_TEXT_LEFT);
                 nk_label(ctx, g_atp[i].description, NK_TEXT_LEFT);
 
-                nk_layout_row_dynamic(ctx, 22, 2);
-                if (nk_button_label(ctx, "Edit")) {
-                    g_show_form = true;
-                    g_is_editing = true;
-                    g_editing_id = g_atp[i].id;
-                    strncpy(g_form_txt1, g_atp[i].description, sizeof(g_form_txt1) - 1);
-                    g_form_status_idx = g_atp[i].order_num;
-                    
-                    g_form_int1 = 0;
-                    for (int tp = 0; tp < g_tp_count; tp++) {
-                        if (g_tp[tp].id == g_atp[i].tp_id) {
-                            g_form_int1 = tp;
-                            break;
+                // Action Buttons inside group cell
+                char act_grp[64];
+                snprintf(act_grp, sizeof(act_grp), "atp_act_%d", g_atp[i].id);
+                if (nk_group_begin(ctx, act_grp, NK_WINDOW_NO_SCROLLBAR)) {
+                    nk_layout_row_dynamic(ctx, 25, 2);
+                    if (nk_button_label(ctx, ICON_EDIT " Edit")) {
+                        g_show_form = true;
+                        g_is_editing = true;
+                        g_editing_id = g_atp[i].id;
+                        strncpy(g_form_txt1, g_atp[i].description, sizeof(g_form_txt1) - 1);
+                        g_form_status_idx = g_atp[i].order_num;
+                        
+                        g_form_int1 = 0;
+                        for (int tp = 0; tp < g_tp_count; tp++) {
+                            if (g_tp[tp].id == g_atp[i].tp_id) {
+                                g_form_int1 = tp;
+                                break;
+                            }
                         }
                     }
-                }
-                if (nk_button_label(ctx, "Hapus")) {
-                    if (db_delete_atp(g_atp[i].id)) {
-                        show_notification("Alur ATP berhasil dihapus.", true);
-                        load_tab_data(MENU_ACADEMIC);
-                    } else {
-                        show_notification("Gagal menghapus ATP!", false);
+                    if (nk_button_label(ctx, ICON_TRASH " Hapus")) {
+                        if (db_delete_atp(g_atp[i].id)) {
+                            show_notification("Alur ATP berhasil dihapus.", true);
+                            load_tab_data(MENU_ACADEMIC);
+                        } else {
+                            show_notification("Gagal menghapus ATP!", false);
+                        }
                     }
+                    nk_group_end(ctx);
                 }
             }
         } else {
@@ -1719,7 +1783,7 @@ static void draw_journal_tab(struct nk_context *ctx, int screen_width) {
             nk_layout_row_template_push_static(ctx, 120);
             nk_layout_row_template_push_static(ctx, 80);
             nk_layout_row_template_push_dynamic(ctx);
-            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_push_static(ctx, 160); // increased for icons
             nk_layout_row_template_end(ctx);
 
             nk_label(ctx, g_journals[i].date, NK_TEXT_LEFT);
@@ -1727,37 +1791,43 @@ static void draw_journal_tab(struct nk_context *ctx, int screen_width) {
             nk_label(ctx, g_journals[i].class_name, NK_TEXT_LEFT);
             nk_label(ctx, g_journals[i].activity, NK_TEXT_LEFT);
 
-            nk_layout_row_dynamic(ctx, 22, 2);
-            if (nk_button_label(ctx, "Edit")) {
-                g_show_form = true;
-                g_is_editing = true;
-                g_editing_id = g_journals[i].id;
-                strncpy(g_form_txt1, g_journals[i].activity, sizeof(g_form_txt1) - 1);
-                strncpy(g_form_txt2, g_journals[i].notes, sizeof(g_form_txt2) - 1);
-                strncpy(g_form_txt3, g_journals[i].date, sizeof(g_form_txt3) - 1);
-                
-                g_form_int1 = 0;
-                for (int t = 0; t < g_teachers_count; t++) {
-                    if (g_teachers[t].id == g_journals[i].teacher_id) {
-                        g_form_int1 = t;
-                        break;
+            // Action Buttons inside group cell
+            char act_grp[64];
+            snprintf(act_grp, sizeof(act_grp), "jrn_act_%d", g_journals[i].id);
+            if (nk_group_begin(ctx, act_grp, NK_WINDOW_NO_SCROLLBAR)) {
+                nk_layout_row_dynamic(ctx, 25, 2);
+                if (nk_button_label(ctx, ICON_EDIT " Edit")) {
+                    g_show_form = true;
+                    g_is_editing = true;
+                    g_editing_id = g_journals[i].id;
+                    strncpy(g_form_txt1, g_journals[i].activity, sizeof(g_form_txt1) - 1);
+                    strncpy(g_form_txt2, g_journals[i].notes, sizeof(g_form_txt2) - 1);
+                    strncpy(g_form_txt3, g_journals[i].date, sizeof(g_form_txt3) - 1);
+                    
+                    g_form_int1 = 0;
+                    for (int t = 0; t < g_teachers_count; t++) {
+                        if (g_teachers[t].id == g_journals[i].teacher_id) {
+                            g_form_int1 = t;
+                            break;
+                        }
+                    }
+                    g_form_gender_idx = 0;
+                    for (int c = 0; c < g_classes_count; c++) {
+                        if (g_classes[c].id == g_journals[i].class_id) {
+                            g_form_gender_idx = c;
+                            break;
+                        }
                     }
                 }
-                g_form_gender_idx = 0;
-                for (int c = 0; c < g_classes_count; c++) {
-                    if (g_classes[c].id == g_journals[i].class_id) {
-                        g_form_gender_idx = c;
-                        break;
+                if (nk_button_label(ctx, ICON_TRASH " Hapus")) {
+                    if (db_delete_journal(g_journals[i].id)) {
+                        show_notification("Jurnal harian berhasil dihapus.", true);
+                        load_tab_data(MENU_JOURNAL);
+                    } else {
+                        show_notification("Gagal menghapus jurnal!", false);
                     }
                 }
-            }
-            if (nk_button_label(ctx, "Hapus")) {
-                if (db_delete_journal(g_journals[i].id)) {
-                    show_notification("Jurnal harian berhasil dihapus.", true);
-                    load_tab_data(MENU_JOURNAL);
-                } else {
-                    show_notification("Gagal menghapus jurnal!", false);
-                }
+                nk_group_end(ctx);
             }
         }
     } else {
@@ -2034,11 +2104,11 @@ static void draw_grades_tab(struct nk_context *ctx, int screen_width) {
         nk_layout_row_dynamic(ctx, 20, 1);
         nk_label_colored(ctx, "DAFTAR CAPAIAN NILAI HARIAN", NK_TEXT_LEFT, g_theme_text_muted);
 
-        nk_layout_row_template_begin(ctx, 20);
+        nk_layout_row_template_begin(ctx, 25);
         nk_layout_row_template_push_static(ctx, 70);  // TP code
         nk_layout_row_template_push_static(ctx, 50);  // score
         nk_layout_row_template_push_dynamic(ctx);     // notes
-        nk_layout_row_template_push_static(ctx, 50);  // delete action
+        nk_layout_row_template_push_static(ctx, 60);  // delete action (increased slightly)
         nk_layout_row_template_end(ctx);
 
         nk_label_colored(ctx, "TP", NK_TEXT_LEFT, nk_rgb(120, 130, 145));
@@ -2047,11 +2117,11 @@ static void draw_grades_tab(struct nk_context *ctx, int screen_width) {
         nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(120, 130, 145));
         
         for (int i = 0; i < g_daily_grades_count; i++) {
-            nk_layout_row_template_begin(ctx, 22);
+            nk_layout_row_template_begin(ctx, 32); // increased to 32
             nk_layout_row_template_push_static(ctx, 70);
             nk_layout_row_template_push_static(ctx, 50);
             nk_layout_row_template_push_dynamic(ctx);
-            nk_layout_row_template_push_static(ctx, 50);
+            nk_layout_row_template_push_static(ctx, 60);
             nk_layout_row_template_end(ctx);
 
             nk_label(ctx, g_daily_grades[i].tp_code, NK_TEXT_LEFT);
@@ -2059,7 +2129,7 @@ static void draw_grades_tab(struct nk_context *ctx, int screen_width) {
             snprintf(sc_buf, sizeof(sc_buf), "%.1f", g_daily_grades[i].score);
             nk_label_colored(ctx, sc_buf, NK_TEXT_LEFT, g_daily_grades[i].score >= 70.0 ? nk_rgb(46, 204, 113) : nk_rgb(192, 57, 43));
             nk_label(ctx, g_daily_grades[i].notes, NK_TEXT_LEFT);
-            if (nk_button_label(ctx, "X")) {
+            if (nk_button_label(ctx, ICON_TRASH)) {
                 if (db_delete_daily_grade(g_daily_grades[i].id)) {
                     show_notification("Nilai harian berhasil dihapus.", true);
                     load_tab_data(MENU_GRADES);
@@ -2072,11 +2142,11 @@ static void draw_grades_tab(struct nk_context *ctx, int screen_width) {
         nk_layout_row_dynamic(ctx, 20, 1);
         nk_label_colored(ctx, "DAFTAR HASIL EVALUASI UJIAN SUMATIF", NK_TEXT_LEFT, g_theme_text_muted);
 
-        nk_layout_row_template_begin(ctx, 20);
+        nk_layout_row_template_begin(ctx, 25);
         nk_layout_row_template_push_dynamic(ctx);     // Subject
         nk_layout_row_template_push_static(ctx, 60);  // Type (UTS/UAS)
         nk_layout_row_template_push_static(ctx, 50);  // score
-        nk_layout_row_template_push_static(ctx, 50);  // action
+        nk_layout_row_template_push_static(ctx, 60);  // action
         nk_layout_row_template_end(ctx);
 
         nk_label_colored(ctx, "Mata Pelajaran", NK_TEXT_LEFT, nk_rgb(120, 130, 145));
@@ -2085,11 +2155,11 @@ static void draw_grades_tab(struct nk_context *ctx, int screen_width) {
         nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(120, 130, 145));
 
         for (int i = 0; i < g_exam_grades_count; i++) {
-            nk_layout_row_template_begin(ctx, 22);
+            nk_layout_row_template_begin(ctx, 32); // increased to 32
             nk_layout_row_template_push_dynamic(ctx);
             nk_layout_row_template_push_static(ctx, 60);
             nk_layout_row_template_push_static(ctx, 50);
-            nk_layout_row_template_push_static(ctx, 50);
+            nk_layout_row_template_push_static(ctx, 60);
             nk_layout_row_template_end(ctx);
 
             nk_label(ctx, g_exam_grades[i].subject, NK_TEXT_LEFT);
@@ -2097,7 +2167,7 @@ static void draw_grades_tab(struct nk_context *ctx, int screen_width) {
             char sc_buf[20];
             snprintf(sc_buf, sizeof(sc_buf), "%.1f", g_exam_grades[i].score);
             nk_label_colored(ctx, sc_buf, NK_TEXT_LEFT, g_exam_grades[i].score >= 70.0 ? nk_rgb(46, 204, 113) : nk_rgb(192, 57, 43));
-            if (nk_button_label(ctx, "X")) {
+            if (nk_button_label(ctx, ICON_TRASH)) {
                 if (db_delete_exam_grade(g_exam_grades[i].id)) {
                     show_notification("Nilai ujian berhasil dihapus.", true);
                     load_tab_data(MENU_GRADES);
@@ -2157,11 +2227,11 @@ static void draw_users_tab(struct nk_context *ctx, int screen_width) {
         nk_rule_horizontal(ctx, g_theme_border, 1);
 
         for (int i = 0; i < g_users_count; i++) {
-            nk_layout_row_template_begin(ctx, 30);
+            nk_layout_row_template_begin(ctx, 35); // increased height to 35
             nk_layout_row_template_push_static(ctx, 120);
             nk_layout_row_template_push_dynamic(ctx);
             nk_layout_row_template_push_static(ctx, 120);
-            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_push_static(ctx, 160); // increased for icons
             nk_layout_row_template_end(ctx);
 
             nk_label(ctx, g_users[i].username, NK_TEXT_LEFT);
@@ -2172,27 +2242,33 @@ static void draw_users_tab(struct nk_context *ctx, int screen_width) {
             else if (g_users[i].role == ROLE_STAF) role_str = "STAF TATA USAHA";
             nk_label(ctx, role_str, NK_TEXT_LEFT);
 
-            nk_layout_row_dynamic(ctx, 22, 2);
-            if (nk_button_label(ctx, "Edit")) {
-                g_show_form = true;
-                g_is_editing = true;
-                g_editing_id = g_users[i].id;
-                strncpy(g_form_txt1, g_users[i].username, sizeof(g_form_txt1) - 1);
-                g_form_txt2[0] = '\0'; // keep empty to not change password
-                strncpy(g_form_txt3, g_users[i].name, sizeof(g_form_txt3) - 1);
-                g_form_role_idx = (int)g_users[i].role;
-            }
-            if (nk_button_label(ctx, "Hapus")) {
-                if (g_users[i].id == g_current_user.id) {
-                    show_notification("Tidak bisa menghapus akun sendiri!", false);
-                } else {
-                    if (db_delete_user(g_users[i].id)) {
-                        show_notification("User berhasil dihapus.", true);
-                        load_tab_data(MENU_USERS);
+            // Action Buttons inside group cell
+            char act_grp[64];
+            snprintf(act_grp, sizeof(act_grp), "usr_act_%d", g_users[i].id);
+            if (nk_group_begin(ctx, act_grp, NK_WINDOW_NO_SCROLLBAR)) {
+                nk_layout_row_dynamic(ctx, 25, 2);
+                if (nk_button_label(ctx, ICON_EDIT " Edit")) {
+                    g_show_form = true;
+                    g_is_editing = true;
+                    g_editing_id = g_users[i].id;
+                    strncpy(g_form_txt1, g_users[i].username, sizeof(g_form_txt1) - 1);
+                    g_form_txt2[0] = '\0'; // keep empty to not change password
+                    strncpy(g_form_txt3, g_users[i].name, sizeof(g_form_txt3) - 1);
+                    g_form_role_idx = (int)g_users[i].role;
+                }
+                if (nk_button_label(ctx, ICON_TRASH " Hapus")) {
+                    if (g_users[i].id == g_current_user.id) {
+                        show_notification("Tidak bisa menghapus akun sendiri!", false);
                     } else {
-                        show_notification("Gagal menghapus user!", false);
+                        if (db_delete_user(g_users[i].id)) {
+                            show_notification("User berhasil dihapus.", true);
+                            load_tab_data(MENU_USERS);
+                        } else {
+                            show_notification("Gagal menghapus user!", false);
+                        }
                     }
                 }
+                nk_group_end(ctx);
             }
         }
     } else {
