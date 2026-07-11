@@ -18,6 +18,7 @@
 
 #include "database/db.h"
 #include "ui/ui.h"
+#include "ui/embedded_fonts.h"
 
 int main(int argc, char *argv[]) {
     // 1. Initialize SQLite database and migrations
@@ -76,91 +77,29 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    // 6. Load TrueType Font (Roboto & FontAwesome) with robust path fallback
-        struct nk_font_atlas *atlas;
+    // 6. Load TrueType Fonts (Roboto & FontAwesome) directly from memory
+    struct nk_font_atlas *atlas;
     nk_sdl_font_stash_begin(&atlas);
     
     struct nk_font *roboto = NULL;
-    struct nk_font *fa = NULL;
     struct nk_font_config cfg = nk_font_config(15);
     static const nk_rune fa_range[] = {0xf000, 0xf900, 0};
     struct nk_font_config fa_cfg = nk_font_config(14);
     fa_cfg.merge_mode = nk_true;
     fa_cfg.range = fa_range;
 
-    // Fallback 1: Local assets folder (current working directory)
-    printf("Font Load Fallback 1: Checking local assets folder...\n");
-    roboto = nk_font_atlas_add_from_file(atlas, "assets/Roboto-Regular.ttf", 15, &cfg);
+    // Load Roboto from embedded array
+    roboto = nk_font_atlas_add_from_memory(atlas, (void*)roboto_regular_ttf, roboto_regular_ttf_len, 15, &cfg);
     if (roboto) {
-        printf("Successfully loaded assets/Roboto-Regular.ttf\n");
-        fa = nk_font_atlas_add_from_file(atlas, "assets/fa-solid-900.ttf", 14, &fa_cfg);
-        if (fa) {
-            printf("Successfully merged assets/fa-solid-900.ttf\n");
-        } else {
-            printf("Failed to load assets/fa-solid-900.ttf!\n");
-        }
+        // Merge FontAwesome from embedded array
+        nk_font_atlas_add_from_memory(atlas, (void*)fa_solid_900_ttf, fa_solid_900_ttf_len, 14, &fa_cfg);
     }
     
-    // Fallback 2: Executable relative path
-    if (!roboto) {
-        char *base_path = SDL_GetBasePath();
-        if (base_path) {
-            char font_path[512];
-            char fa_path[512];
-            snprintf(font_path, sizeof(font_path), "%sassets/Roboto-Regular.ttf", base_path);
-            printf("Font Load Fallback 2: Checking base path: %s\n", font_path);
-            roboto = nk_font_atlas_add_from_file(atlas, font_path, 15, &cfg);
-            if (roboto) {
-                printf("Successfully loaded %s\n", font_path);
-                snprintf(fa_path, sizeof(fa_path), "%sassets/fa-solid-900.ttf", base_path);
-                fa = nk_font_atlas_add_from_file(atlas, fa_path, 14, &fa_cfg);
-                if (fa) {
-                    printf("Successfully merged %s\n", fa_path);
-                } else {
-                    printf("Failed to load %s!\n", fa_path);
-                }
-            }
-            
-            // Fallback 3: Installed Debian path (relative to /usr/bin)
-            if (!roboto) {
-                snprintf(font_path, sizeof(font_path), "%s../share/dangerpca/assets/Roboto-Regular.ttf", base_path);
-                printf("Font Load Fallback 3: Checking relative share path: %s\n", font_path);
-                roboto = nk_font_atlas_add_from_file(atlas, font_path, 15, &cfg);
-                if (roboto) {
-                    printf("Successfully loaded %s\n", font_path);
-                    snprintf(fa_path, sizeof(fa_path), "%s../share/dangerpca/assets/fa-solid-900.ttf", base_path);
-                    fa = nk_font_atlas_add_from_file(atlas, fa_path, 14, &fa_cfg);
-                    if (fa) {
-                        printf("Successfully merged %s\n", fa_path);
-                    } else {
-                        printf("Failed to load %s!\n", fa_path);
-                    }
-                }
-            }
-            SDL_free(base_path);
-        }
-    }
-    
-    // Fallback 4: Absolute Linux installation directory
-    if (!roboto) {
-        printf("Font Load Fallback 4: Checking absolute share path /usr/share/dangerpca/assets/...\n");
-        roboto = nk_font_atlas_add_from_file(atlas, "/usr/share/dangerpca/assets/Roboto-Regular.ttf", 15, &cfg);
-        if (roboto) {
-            printf("Successfully loaded absolute path Roboto\n");
-            fa = nk_font_atlas_add_from_file(atlas, "/usr/share/dangerpca/assets/fa-solid-900.ttf", 14, &fa_cfg);
-            if (fa) {
-                printf("Successfully merged absolute path FontAwesome\n");
-            } else {
-                printf("Failed to load absolute path FontAwesome!\n");
-            }
-        }
-    }
-
     nk_sdl_font_stash_end();
     if (roboto) {
         nk_style_set_font(ctx, &roboto->handle);
     } else {
-        printf("Warning: Font assets/Roboto-Regular.ttf not loaded, using fallback font.\n");
+        printf("Warning: Embedded fonts failed to load, using fallback font.\n");
     }
 
     // 7. Initialize UI State and Theme
