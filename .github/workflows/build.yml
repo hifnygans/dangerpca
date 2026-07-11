@@ -3,8 +3,10 @@ name: Build and Package ERP
 on:
   push:
     branches: [ main, master ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   build-linux:
@@ -79,3 +81,50 @@ jobs:
         with:
           name: dangerpca-windows-x64
           path: build/Release/dangerpca.exe
+
+  release:
+    name: Create GitHub Release
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Linux DEB Package
+        uses: actions/download-artifact@v4
+        with:
+          name: dangerpca-linux-deb
+          path: ./dist-linux-deb
+
+      - name: Download Linux Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: dangerpca-linux-binary
+          path: ./dist-linux-bin
+
+      - name: Download Windows Binary
+        uses: actions/download-artifact@v4
+        with:
+          name: dangerpca-windows-x64
+          path: ./dist-windows
+
+      - name: Prepare Release Assets
+        run: |
+          mkdir -p ./release-assets
+          # Copy debian package
+          cp ./dist-linux-deb/*.deb ./release-assets/ || true
+          # Copy linux standalone binary and rename
+          cp ./dist-linux-bin/dangerpca ./release-assets/dangerpca-linux || true
+          # Copy windows exe and rename
+          cp ./dist-windows/dangerpca.exe ./release-assets/dangerpca-windows.exe || true
+
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
