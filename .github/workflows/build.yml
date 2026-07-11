@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install System Dependencies
         run: |
@@ -37,13 +37,13 @@ jobs:
           cpack -G DEB
 
       - name: Upload Debian Package Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dangerpca-linux-deb
           path: build/*.deb
 
       - name: Upload Linux Executable
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dangerpca-linux-binary
           path: build/dangerpca
@@ -54,7 +54,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up MSVC & Developer Command Prompt
         uses: ilammy/msvc-dev-cmd@v1
@@ -75,7 +75,7 @@ jobs:
           cmake --build . --config Release
 
       - name: Upload Windows Executable
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dangerpca-windows-x64
           path: build/Release/dangerpca.exe
