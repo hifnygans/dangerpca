@@ -1,0 +1,10 @@
+Architecture: amd64
+Depends: libsdl2-2.0-0, libsqlite3-0, libc6 (>= 2.38), libsdl2-2.0-0 (>= 2.0.18), libsqlite3-0 (>= 3.6.11)
+Description: Sistem ERP Sekolah Offline Desktop Berkinerja Tinggi
+Maintainer: Hifni
+Package: dangerpca
+Priority: optional
+Section: education
+Version: 1.0.0
+Installed-Size: 959
+

@@ -1,0 +1,2042 @@
+#define NK_INCLUDE_DEFAULT_ALLOCATOR
+#define NK_INCLUDE_STANDARD_IO
+#define NK_INCLUDE_STANDARD_VARARGS
+#define NK_INCLUDE_FONT_BAKING
+#define NK_INCLUDE_DEFAULT_FONT
+#define NK_INCLUDE_VERTEX_BUFFER_OUTPUT
+#include "ui.h"
+#include "../database/db.h"
+#include "../services/services.h"
+#include "../models/models.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <time.h>
+
+// Global State
+static SidebarMenu g_current_menu = MENU_DASHBOARD;
+static bool g_logged_in = false;
+static User g_current_user = {0};
+
+// Login Inputs
+static char g_login_user[50] = "";
+static char g_login_pass[50] = "";
+
+// Caches & Counts
+static DashboardStats g_stats = {0};
+static Student g_students[500];
+static int g_students_count = 0;
+static Teacher g_teachers[200];
+static int g_teachers_count = 0;
+static ClassEntity g_classes[100];
+static int g_classes_count = 0;
+static Attendance g_attendance[500];
+static int g_attendance_count = 0;
+static CapaianPembelajaran g_cp[200];
+static int g_cp_count = 0;
+static TujuanPembelajaran g_tp[300];
+static int g_tp_count = 0;
+static AlurTujuanPembelajaran g_atp[300];
+static int g_atp_count = 0;
+static DailyJournal g_journals[200];
+static int g_journals_count = 0;
+static DailyGrade g_daily_grades[500];
+static int g_daily_grades_count = 0;
+static ExamGrade g_exam_grades[500];
+static int g_exam_grades_count = 0;
+static User g_users[100];
+static int g_users_count = 0;
+
+// Search & Filter state
+static char g_search_query[100] = "";
+static int g_class_filter_id = 0;
+static char g_attendance_date[20] = "";
+static int g_selected_class_idx = 0;
+static int g_selected_student_idx = 0;
+static int g_selected_tp_idx = 0;
+static char g_subject_filter[100] = "Matematika";
+
+// Form States (Editing / Adding)
+static bool g_show_form = false;
+static bool g_is_editing = false;
+static int g_editing_id = 0;
+
+// Temporary Form Buffers
+static char g_form_txt1[200] = "";
+static char g_form_txt2[200] = "";
+static char g_form_txt3[200] = "";
+static char g_form_txt4[200] = "";
+static char g_form_txt5[200] = "";
+static char g_form_txt6[200] = "";
+static int g_form_int1 = 0;
+static double g_form_dbl1 = 0.0;
+static int g_form_gender_idx = 0; // 0=L, 1=P
+static int g_form_status_idx = 0;
+static int g_form_role_idx = 0;
+
+// Backup / Restore Buffers
+static char g_backup_path[256] = "dangerpca_backup.db";
+static char g_restore_path[256] = "dangerpca_backup.db";
+
+// Notifications
+static char g_notification_msg[128] = "";
+static time_t g_notification_expiry = 0;
+static bool g_notification_success = true;
+
+static void show_notification(const char *msg, bool success) {
+    strncpy(g_notification_msg, msg, sizeof(g_notification_msg) - 1);
+    g_notification_expiry = time(NULL) + 3;
+    g_notification_success = success;
+}
+
+static void get_today_date(char *buf, int max_len) {
+    time_t t = time(NULL);
+    struct tm *tm_info = localtime(&t);
+    strftime(buf, max_len, "%Y-%m-%d", tm_info);
+}
+
+// Data loading manager
+static void load_tab_data(SidebarMenu menu) {
+    g_show_form = false;
+    switch (menu) {
+        case MENU_DASHBOARD:
+            db_get_dashboard_stats(&g_stats);
+            break;
+        case MENU_STUDENTS:
+            db_get_students(g_students, 500, g_search_query, g_class_filter_id, &g_students_count);
+            db_get_classes(g_classes, 100, &g_classes_count);
+            break;
+        case MENU_TEACHERS:
+            db_get_teachers(g_teachers, 200, g_search_query, &g_teachers_count);
+            break;
+        case MENU_CLASSES:
+            db_get_classes(g_classes, 100, &g_classes_count);
+            db_get_teachers(g_teachers, 200, NULL, &g_teachers_count);
+            break;
+        case MENU_ATTENDANCE:
+            db_get_classes(g_classes, 100, &g_classes_count);
+            if (g_classes_count > 0) {
+                if (g_selected_class_idx >= g_classes_count) g_selected_class_idx = 0;
+                db_get_attendance(g_attendance, 500, g_attendance_date, g_classes[g_selected_class_idx].id, &g_attendance_count);
+            }
+            break;
+        case MENU_ACADEMIC:
+            db_get_cp(g_cp, 200, g_search_query, &g_cp_count);
+            db_get_tp(g_tp, 300, 0, &g_tp_count);
+            db_get_atp(g_atp, 300, 0, &g_atp_count);
+            break;
+        case MENU_JOURNAL:
+            db_get_journal(g_journals, 200, g_attendance_date, 0, &g_journals_count);
+            db_get_teachers(g_teachers, 200, NULL, &g_teachers_count);
+            db_get_classes(g_classes, 100, &g_classes_count);
+            break;
+        case MENU_GRADES:
+            db_get_students(g_students, 500, NULL, 0, &g_students_count);
+            db_get_tp(g_tp, 300, 0, &g_tp_count);
+            if (g_students_count > 0) {
+                if (g_selected_student_idx >= g_students_count) g_selected_student_idx = 0;
+                db_get_daily_grades(g_daily_grades, 500, g_students[g_selected_student_idx].id, 0, &g_daily_grades_count);
+                db_get_exam_grades(g_exam_grades, 500, g_students[g_selected_student_idx].id, NULL, &g_exam_grades_count);
+            }
+            break;
+        case MENU_USERS:
+            db_get_users(g_users, 100, &g_users_count);
+            break;
+        case MENU_BACKUP:
+            break;
+    }
+}
+
+// Custom UI theme setup
+static void set_dark_theme(struct nk_context *ctx) {
+    struct nk_color table[NK_COLOR_COUNT];
+    table[NK_COLOR_TEXT] = nk_rgba(230, 235, 245, 255);
+    table[NK_COLOR_WINDOW] = nk_rgba(20, 24, 33, 255);
+    table[NK_COLOR_HEADER] = nk_rgba(30, 36, 48, 255);
+    table[NK_COLOR_BORDER] = nk_rgba(45, 54, 72, 255);
+    table[NK_COLOR_BUTTON] = nk_rgba(31, 38, 51, 255);
+    table[NK_COLOR_BUTTON_HOVER] = nk_rgba(62, 141, 240, 255);
+    table[NK_COLOR_BUTTON_ACTIVE] = nk_rgba(43, 108, 176, 255);
+    table[NK_COLOR_TOGGLE] = nk_rgba(31, 38, 51, 255);
+    table[NK_COLOR_TOGGLE_HOVER] = nk_rgba(62, 141, 240, 255);
+    table[NK_COLOR_TOGGLE_CURSOR] = nk_rgba(62, 141, 240, 255);
+    table[NK_COLOR_SELECT] = nk_rgba(45, 54, 72, 255);
+    table[NK_COLOR_SELECT_ACTIVE] = nk_rgba(62, 141, 240, 255);
+    table[NK_COLOR_SLIDER] = nk_rgba(31, 38, 51, 255);
+    table[NK_COLOR_SLIDER_CURSOR] = nk_rgba(62, 141, 240, 255);
+    table[NK_COLOR_SLIDER_CURSOR_HOVER] = nk_rgba(80, 160, 250, 255);
+    table[NK_COLOR_SLIDER_CURSOR_ACTIVE] = nk_rgba(43, 108, 176, 255);
+    table[NK_COLOR_PROPERTY] = nk_rgba(31, 38, 51, 255);
+    table[NK_COLOR_EDIT] = nk_rgba(30, 36, 48, 255);
+    table[NK_COLOR_EDIT_CURSOR] = nk_rgba(230, 235, 245, 255);
+    table[NK_COLOR_COMBO] = nk_rgba(31, 38, 51, 255);
+    table[NK_COLOR_CHART] = nk_rgba(31, 38, 51, 255);
+    table[NK_COLOR_CHART_COLOR] = nk_rgba(62, 141, 240, 255);
+    table[NK_COLOR_CHART_COLOR_HIGHLIGHT] = nk_rgba(255, 0, 0, 255);
+    table[NK_COLOR_SCROLLBAR] = nk_rgba(20, 24, 33, 255);
+    table[NK_COLOR_SCROLLBAR_CURSOR] = nk_rgba(45, 54, 72, 255);
+    table[NK_COLOR_SCROLLBAR_CURSOR_HOVER] = nk_rgba(62, 141, 240, 255);
+    table[NK_COLOR_SCROLLBAR_CURSOR_ACTIVE] = nk_rgba(43, 108, 176, 255);
+    table[NK_COLOR_TAB_HEADER] = nk_rgba(30, 36, 48, 255);
+    nk_style_from_table(ctx, table);
+}
+
+void ui_init(struct nk_context *ctx) {
+    set_dark_theme(ctx);
+    get_today_date(g_attendance_date, sizeof(g_attendance_date));
+    load_tab_data(MENU_DASHBOARD);
+}
+
+void ui_cleanup(void) {
+    // Release cached structures if dynamic resources were used
+}
+
+// DRAW HELPER: Draw Notification Banner
+static void draw_notification(struct nk_context *ctx, int screen_width) {
+    if (time(NULL) < g_notification_expiry) {
+        struct nk_rect bounds = nk_rect(screen_width - 320, 20, 300, 50);
+        struct nk_color bg = g_notification_success ? nk_rgb(39, 174, 96) : nk_rgb(192, 57, 43);
+        
+        if (nk_begin(ctx, "NotificationPopup", bounds, 
+            NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_BACKGROUND | NK_WINDOW_BORDER)) {
+            
+            // Draw background rectangle
+            struct nk_command_buffer *canvas = nk_window_get_canvas(ctx);
+            struct nk_rect win_rect = nk_window_get_bounds(ctx);
+            nk_fill_rect(canvas, win_rect, 4.0f, bg);
+            
+            nk_layout_row_dynamic(ctx, 30, 1);
+            nk_label_colored(ctx, g_notification_msg, NK_TEXT_CENTERED, nk_rgb(255, 255, 255));
+        }
+        nk_end(ctx);
+    }
+}
+
+// SUB-SCREEN: Login
+static void draw_login_screen(struct nk_context *ctx, int width, int height) {
+    struct nk_rect login_bounds = nk_rect(width / 2 - 175, height / 2 - 150, 350, 280);
+    if (nk_begin(ctx, "Login", login_bounds, NK_WINDOW_TITLE | NK_WINDOW_BORDER | NK_WINDOW_NO_SCROLLBAR)) {
+        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_label(ctx, "DANGERPCA ERP SEKOLAH", NK_TEXT_CENTERED);
+        nk_label(ctx, "Silakan login untuk masuk ke dashboard.", NK_TEXT_CENTERED);
+        
+        nk_layout_row_dynamic(ctx, 10, 1); // Spacer
+        
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label(ctx, "Username", NK_TEXT_LEFT);
+        
+        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD | NK_EDIT_SIG_ENTER, g_login_user, sizeof(g_login_user), nk_filter_ascii);
+        
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label(ctx, "Password", NK_TEXT_LEFT);
+        
+        nk_layout_row_dynamic(ctx, 30, 1);
+        // Nuklear uses a simple visual filter for password or we edit directly
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD | NK_EDIT_SIG_ENTER, g_login_pass, sizeof(g_login_pass), nk_filter_ascii);
+        
+        nk_layout_row_dynamic(ctx, 15, 1); // Spacer
+        
+        nk_layout_row_dynamic(ctx, 35, 1);
+        if (nk_button_label(ctx, "LOGIN")) {
+            User user;
+            if (db_authenticate_user(g_login_user, g_login_pass, &user)) {
+                g_logged_in = true;
+                g_current_user = user;
+                show_notification("Login sukses! Selamat datang.", true);
+                load_tab_data(MENU_DASHBOARD);
+            } else {
+                show_notification("Username atau Password salah!", false);
+            }
+        }
+    }
+    nk_end(ctx);
+}
+
+// SUB-SCREEN: Sidebar
+static void draw_sidebar(struct nk_context *ctx, int height) {
+    if (nk_group_begin(ctx, "Sidebar", NK_WINDOW_BORDER)) {
+        nk_layout_row_dynamic(ctx, 35, 1);
+        nk_label(ctx, " DANGERPCA ERP ", NK_TEXT_CENTERED);
+        nk_layout_row_dynamic(ctx, 1, 1);
+        nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+        nk_layout_row_dynamic(ctx, 10, 1); // Spacer
+
+        const char *menus[] = {
+            "Dashboard", "Data Murid", "Data Guru", "Data Kelas",
+            "Absensi Harian", "Capaian CP/TP", "Jurnal Harian",
+            "Nilai & Transkrip", "Pengguna", "Backup & Restore"
+        };
+        SidebarMenu mapping[] = {
+            MENU_DASHBOARD, MENU_STUDENTS, MENU_TEACHERS, MENU_CLASSES,
+            MENU_ATTENDANCE, MENU_ACADEMIC, MENU_JOURNAL,
+            MENU_GRADES, MENU_USERS, MENU_BACKUP
+        };
+
+        for (int i = 0; i < 10; i++) {
+            if (g_current_menu == mapping[i]) {
+                // Highlight active button
+                ctx->style.button.normal.data.color = nk_rgb(62, 141, 240);
+                ctx->style.button.text_normal = nk_rgb(255, 255, 255);
+            } else {
+                ctx->style.button.normal.data.color = nk_rgb(31, 38, 51);
+                ctx->style.button.text_normal = nk_rgb(230, 235, 245);
+            }
+
+            if (nk_button_label(ctx, menus[i])) {
+                g_current_menu = mapping[i];
+                load_tab_data(g_current_menu);
+            }
+        }
+        
+        // Reset styles
+        ctx->style.button.normal.data.color = nk_rgb(31, 38, 51);
+        ctx->style.button.text_normal = nk_rgb(230, 235, 245);
+
+        nk_group_end(ctx);
+    }
+}
+
+// SUB-SCREEN: Top Bar
+static void draw_topbar(struct nk_context *ctx) {
+    if (nk_group_begin(ctx, "Topbar", NK_WINDOW_NO_SCROLLBAR)) {
+        nk_layout_row_template_begin(ctx, 30);
+        nk_layout_row_template_push_static(ctx, 120); // Role tag
+        nk_layout_row_template_push_dynamic(ctx);     // Welcome message
+        nk_layout_row_template_push_static(ctx, 100); // Logout Button
+        nk_layout_row_template_end(ctx);
+
+        const char *role_str = "ADMINISTRATOR";
+        if (g_current_user.role == ROLE_GURU) role_str = "GURU BINAAN";
+        else if (g_current_user.role == ROLE_STAF) role_str = "STAF TATA USAHA";
+
+        char role_tag[150];
+        snprintf(role_tag, sizeof(role_tag), "[%s]", role_str);
+        nk_label_colored(ctx, role_tag, NK_TEXT_LEFT, nk_rgb(62, 141, 240));
+
+        char welcome[200];
+        snprintf(welcome, sizeof(welcome), "Selamat Bekerja, %s", g_current_user.name);
+        nk_label(ctx, welcome, NK_TEXT_LEFT);
+
+        if (nk_button_label(ctx, "LOGOUT")) {
+            g_logged_in = false;
+            memset(&g_current_user, 0, sizeof(g_current_user));
+            memset(g_login_user, 0, sizeof(g_login_user));
+            memset(g_login_pass, 0, sizeof(g_login_pass));
+            show_notification("Anda telah keluar dari aplikasi.", true);
+        }
+        nk_group_end(ctx);
+    }
+}
+
+// SUB-SCREEN: Dashboard
+static void draw_dashboard(struct nk_context *ctx) {
+    nk_layout_row_dynamic(ctx, 30, 1);
+    nk_label_colored(ctx, "DASHBOARD MONITORING SEKOLAH", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+
+    // Stats Grid
+    nk_layout_row_dynamic(ctx, 100, 4);
+
+    // Card 1: Total Students
+    if (nk_group_begin(ctx, "CardSiswa", NK_WINDOW_BORDER)) {
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label_colored(ctx, "TOTAL SISWA AKTIF", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_layout_row_dynamic(ctx, 40, 1);
+        char buf[50];
+        snprintf(buf, sizeof(buf), "%d Siswa", g_stats.total_students);
+        nk_label_colored(ctx, buf, NK_TEXT_LEFT, nk_rgb(46, 204, 113));
+        nk_group_end(ctx);
+    }
+
+    // Card 2: Total Teachers
+    if (nk_group_begin(ctx, "CardGuru", NK_WINDOW_BORDER)) {
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label_colored(ctx, "TOTAL GURU", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_layout_row_dynamic(ctx, 40, 1);
+        char buf[50];
+        snprintf(buf, sizeof(buf), "%d Guru", g_stats.total_teachers);
+        nk_label_colored(ctx, buf, NK_TEXT_LEFT, nk_rgb(52, 152, 219));
+        nk_group_end(ctx);
+    }
+
+    // Card 3: Total Classes
+    if (nk_group_begin(ctx, "CardKelas", NK_WINDOW_BORDER)) {
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label_colored(ctx, "TOTAL KELAS", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_layout_row_dynamic(ctx, 40, 1);
+        char buf[50];
+        snprintf(buf, sizeof(buf), "%d Rombel", g_stats.total_classes);
+        nk_label_colored(ctx, buf, NK_TEXT_LEFT, nk_rgb(241, 196, 15));
+        nk_group_end(ctx);
+    }
+
+    // Card 4: Attendance Today
+    if (nk_group_begin(ctx, "CardAttendance", NK_WINDOW_BORDER)) {
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label_colored(ctx, "KEHADIRAN HARI INI", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_layout_row_dynamic(ctx, 40, 1);
+        char buf[50];
+        snprintf(buf, sizeof(buf), "%.1f %%", g_stats.attendance_rate_today);
+        nk_label_colored(ctx, buf, NK_TEXT_LEFT, nk_rgb(155, 89, 182));
+        nk_group_end(ctx);
+    }
+
+    nk_layout_row_dynamic(ctx, 20, 1); // Spacer
+
+    // Overview details
+    nk_layout_row_dynamic(ctx, 260, 1);
+    if (nk_group_begin(ctx, "AppOverview", NK_WINDOW_BORDER)) {
+        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_label(ctx, "Selamat datang di Sistem ERP Sekolah Offline (Commercial Grade).", NK_TEXT_LEFT);
+        nk_label(ctx, "Fitur-fitur utama:", NK_TEXT_LEFT);
+        
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label(ctx, " - Manajemen data Murid, Guru, dan Rombongan Belajar (Kelas).", NK_TEXT_LEFT);
+        nk_label(ctx, " - Pencatatan Kehadiran (Absensi) harian terintegrasi ekspor laporan.", NK_TEXT_LEFT);
+        nk_label(ctx, " - Kurikulum: Capaian Pembelajaran (CP), Tujuan Pembelajaran (TP) & ATP.", NK_TEXT_LEFT);
+        nk_label(ctx, " - Evaluasi Belajar: Nilai Harian format TP & Ujian Akhir (UTS/UAS).", NK_TEXT_LEFT);
+        nk_label(ctx, " - Database & Keamanan: Ekspor laporan PDF & CSV (Excel) serta backup instan.", NK_TEXT_LEFT);
+        
+        nk_layout_row_dynamic(ctx, 20, 1); // Spacer
+        nk_label_colored(ctx, "Sistem berjalan penuh secara offline dengan SQLite local database engine.", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_group_end(ctx);
+    }
+}
+
+// SUB-SCREEN: Students Tab
+static void draw_students_tab(struct nk_context *ctx) {
+    nk_layout_row_dynamic(ctx, 30, 1);
+    nk_label_colored(ctx, "MANAJEMEN DATA MURID", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+
+    if (!g_show_form) {
+        // Toolbar (Search, Filter, Export, Add Buttons)
+        nk_layout_row_template_begin(ctx, 35);
+        nk_layout_row_template_push_static(ctx, 150); // Search bar
+        nk_layout_row_template_push_static(ctx, 100); // Search button
+        nk_layout_row_template_push_static(ctx, 120); // Export CSV
+        nk_layout_row_template_push_static(ctx, 120); // Export PDF
+        nk_layout_row_template_push_dynamic(ctx);     // Spacer
+        nk_layout_row_template_push_static(ctx, 150); // Tambah Siswa button
+        nk_layout_row_template_end(ctx);
+
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_search_query, sizeof(g_search_query), nk_filter_ascii);
+        if (nk_button_label(ctx, "Cari")) {
+            load_tab_data(MENU_STUDENTS);
+        }
+        if (nk_button_label(ctx, "Ekspor CSV")) {
+            if (service_export_students_csv("siswa_export.csv")) {
+                show_notification("Sukses mengekspor siswa_export.csv!", true);
+            } else {
+                show_notification("Gagal mengekspor CSV!", false);
+            }
+        }
+        if (nk_button_label(ctx, "Ekspor PDF")) {
+            if (service_export_students_pdf("siswa_export.pdf")) {
+                show_notification("Sukses mengekspor siswa_export.pdf!", true);
+            } else {
+                show_notification("Gagal mengekspor PDF!", false);
+            }
+        }
+        nk_spacing(ctx, 1);
+        if (nk_button_label(ctx, "+ TAMBAH SISWA")) {
+            g_show_form = true;
+            g_is_editing = false;
+            g_editing_id = 0;
+            g_form_txt1[0] = '\0'; // nisn
+            g_form_txt2[0] = '\0'; // nama
+            g_form_txt3[0] = '\0'; // dob
+            g_form_txt4[0] = '\0'; // address
+            g_form_int1 = 0;       // class index
+            g_form_gender_idx = 0; // L
+            g_form_status_idx = 0; // Aktif
+        }
+
+        nk_layout_row_dynamic(ctx, 15, 1); // Spacer
+
+        // Tabular list
+        nk_layout_row_template_begin(ctx, 25);
+        nk_layout_row_template_push_static(ctx, 80);  // NISN
+        nk_layout_row_template_push_dynamic(ctx);     // Nama
+        nk_layout_row_template_push_static(ctx, 80);  // Kelas
+        nk_layout_row_template_push_static(ctx, 50);  // JK
+        nk_layout_row_template_push_static(ctx, 80);  // Status
+        nk_layout_row_template_push_static(ctx, 120); // Action Buttons
+        nk_layout_row_template_end(ctx);
+
+        // Header
+        nk_label_colored(ctx, "NISN", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Nama Siswa", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Kelas", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "JK", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Status", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+
+        nk_layout_row_dynamic(ctx, 1, 1);
+        nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+
+        for (int i = 0; i < g_students_count; i++) {
+            nk_layout_row_template_begin(ctx, 30);
+            nk_layout_row_template_push_static(ctx, 80);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_push_static(ctx, 80);
+            nk_layout_row_template_push_static(ctx, 50);
+            nk_layout_row_template_push_static(ctx, 80);
+            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_end(ctx);
+
+            nk_label(ctx, g_students[i].nisn, NK_TEXT_LEFT);
+            nk_label(ctx, g_students[i].name, NK_TEXT_LEFT);
+            nk_label(ctx, g_students[i].class_name, NK_TEXT_LEFT);
+            nk_label(ctx, g_students[i].gender, NK_TEXT_LEFT);
+            nk_label(ctx, g_students[i].status, NK_TEXT_LEFT);
+
+            // Edit / Delete Buttons
+            nk_layout_row_dynamic(ctx, 22, 2);
+            if (nk_button_label(ctx, "Edit")) {
+                g_show_form = true;
+                g_is_editing = true;
+                g_editing_id = g_students[i].id;
+                strncpy(g_form_txt1, g_students[i].nisn, sizeof(g_form_txt1) - 1);
+                strncpy(g_form_txt2, g_students[i].name, sizeof(g_form_txt2) - 1);
+                strncpy(g_form_txt3, g_students[i].dob, sizeof(g_form_txt3) - 1);
+                strncpy(g_form_txt4, g_students[i].address, sizeof(g_form_txt4) - 1);
+                
+                g_form_gender_idx = (strcmp(g_students[i].gender, "L") == 0) ? 0 : 1;
+                
+                if (strcmp(g_students[i].status, "Aktif") == 0) g_form_status_idx = 0;
+                else if (strcmp(g_students[i].status, "Lulus") == 0) g_form_status_idx = 1;
+                else g_form_status_idx = 2;
+
+                g_form_int1 = 0;
+                for (int c = 0; c < g_classes_count; c++) {
+                    if (g_classes[c].id == g_students[i].class_id) {
+                        g_form_int1 = c + 1; // 0 index represents "No class"
+                        break;
+                    }
+                }
+            }
+            if (nk_button_label(ctx, "Hapus")) {
+                if (db_delete_student(g_students[i].id)) {
+                    show_notification("Data murid berhasil dihapus.", true);
+                    load_tab_data(MENU_STUDENTS);
+                } else {
+                    show_notification("Gagal menghapus data murid!", false);
+                }
+            }
+        }
+    } else {
+        // Form Panel
+        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_label(ctx, g_is_editing ? "EDIT DATA MURID" : "TAMBAH MURID BARU", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 22, 2);
+        nk_label(ctx, "NISN", NK_TEXT_LEFT);
+        nk_label(ctx, "Nama Lengkap", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 30, 2);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt1, sizeof(g_form_txt1), nk_filter_decimal);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt2, sizeof(g_form_txt2), nk_filter_ascii);
+
+        nk_layout_row_dynamic(ctx, 22, 2);
+        nk_label(ctx, "Kelas", NK_TEXT_LEFT);
+        nk_label(ctx, "Jenis Kelamin", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 30, 2);
+        // Build class dropdown list
+        const char *class_options[101];
+        class_options[0] = "-- Tanpa Kelas --";
+        for (int c = 0; c < g_classes_count; c++) {
+            class_options[c + 1] = g_classes[c].name;
+        }
+        g_form_int1 = nk_combo(ctx, class_options, g_classes_count + 1, g_form_int1, 25, nk_vec2(200, 200));
+        
+        const char *gender_options[] = {"Laki-laki (L)", "Perempuan (P)"};
+        g_form_gender_idx = nk_combo(ctx, gender_options, 2, g_form_gender_idx, 25, nk_vec2(200, 100));
+
+        nk_layout_row_dynamic(ctx, 22, 2);
+        nk_label(ctx, "Tanggal Lahir (YYYY-MM-DD)", NK_TEXT_LEFT);
+        nk_label(ctx, "Status Keaktifan", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 30, 2);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt3, sizeof(g_form_txt3), nk_filter_ascii);
+        
+        const char *status_options[] = {"Aktif", "Lulus", "Keluar"};
+        g_form_status_idx = nk_combo(ctx, status_options, 3, g_form_status_idx, 25, nk_vec2(200, 100));
+
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label(ctx, "Alamat Rumah", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 50, 1);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX, g_form_txt4, sizeof(g_form_txt4), nk_filter_ascii);
+
+        nk_layout_row_dynamic(ctx, 20, 1); // Spacer
+
+        nk_layout_row_dynamic(ctx, 35, 2);
+        if (nk_button_label(ctx, "SIMPAN")) {
+            if (strlen(g_form_txt1) == 0 || strlen(g_form_txt2) == 0) {
+                show_notification("NISN dan Nama wajib diisi!", false);
+            } else {
+                Student s;
+                s.id = g_editing_id;
+                strncpy(s.nisn, g_form_txt1, sizeof(s.nisn) - 1);
+                strncpy(s.name, g_form_txt2, sizeof(s.name) - 1);
+                s.class_id = (g_form_int1 > 0) ? g_classes[g_form_int1 - 1].id : 0;
+                strncpy(s.gender, g_form_gender_idx == 0 ? "L" : "P", sizeof(s.gender) - 1);
+                strncpy(s.dob, g_form_txt3, sizeof(s.dob) - 1);
+                strncpy(s.address, g_form_txt4, sizeof(s.address) - 1);
+                
+                if (g_form_status_idx == 0) strncpy(s.status, "Aktif", sizeof(s.status) - 1);
+                else if (g_form_status_idx == 1) strncpy(s.status, "Lulus", sizeof(s.status) - 1);
+                else strncpy(s.status, "Keluar", sizeof(s.status) - 1);
+
+                bool success = g_is_editing ? db_update_student(&s) : db_create_student(&s);
+                if (success) {
+                    show_notification("Data murid berhasil disimpan.", true);
+                    g_show_form = false;
+                    load_tab_data(MENU_STUDENTS);
+                } else {
+                    show_notification("Gagal menyimpan data murid (NISN unik)!", false);
+                }
+            }
+        }
+        if (nk_button_label(ctx, "BATAL")) {
+            g_show_form = false;
+        }
+    }
+}
+
+// SUB-SCREEN: Teachers Tab
+static void draw_teachers_tab(struct nk_context *ctx) {
+    nk_layout_row_dynamic(ctx, 30, 1);
+    nk_label_colored(ctx, "MANAJEMEN DATA GURU", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+
+    if (!g_show_form) {
+        // Toolbar
+        nk_layout_row_template_begin(ctx, 35);
+        nk_layout_row_template_push_static(ctx, 150); // Search bar
+        nk_layout_row_template_push_static(ctx, 100); // Search button
+        nk_layout_row_template_push_static(ctx, 120); // Export CSV
+        nk_layout_row_template_push_static(ctx, 120); // Export PDF
+        nk_layout_row_template_push_dynamic(ctx);     // Spacer
+        nk_layout_row_template_push_static(ctx, 150); // Tambah Guru button
+        nk_layout_row_template_end(ctx);
+
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_search_query, sizeof(g_search_query), nk_filter_ascii);
+        if (nk_button_label(ctx, "Cari")) {
+            load_tab_data(MENU_TEACHERS);
+        }
+        if (nk_button_label(ctx, "Ekspor CSV")) {
+            if (service_export_teachers_csv("guru_export.csv")) {
+                show_notification("Sukses mengekspor guru_export.csv!", true);
+            } else {
+                show_notification("Gagal mengekspor CSV!", false);
+            }
+        }
+        if (nk_button_label(ctx, "Ekspor PDF")) {
+            if (service_export_teachers_pdf("guru_export.pdf")) {
+                show_notification("Sukses mengekspor guru_export.pdf!", true);
+            } else {
+                show_notification("Gagal mengekspor PDF!", false);
+            }
+        }
+        nk_spacing(ctx, 1);
+        if (nk_button_label(ctx, "+ TAMBAH GURU")) {
+            g_show_form = true;
+            g_is_editing = false;
+            g_editing_id = 0;
+            g_form_txt1[0] = '\0'; // nip
+            g_form_txt2[0] = '\0'; // nama
+            g_form_txt3[0] = '\0'; // subject
+            g_form_txt4[0] = '\0'; // phone
+            g_form_gender_idx = 0; // L
+            g_form_status_idx = 0; // Aktif
+        }
+
+        nk_layout_row_dynamic(ctx, 15, 1); // Spacer
+
+        // Tabular list
+        nk_layout_row_template_begin(ctx, 25);
+        nk_layout_row_template_push_static(ctx, 120); // NIP
+        nk_layout_row_template_push_dynamic(ctx);     // Nama
+        nk_layout_row_template_push_static(ctx, 50);  // JK
+        nk_layout_row_template_push_static(ctx, 120); // Subject
+        nk_layout_row_template_push_static(ctx, 80);  // Status
+        nk_layout_row_template_push_static(ctx, 120); // Action Buttons
+        nk_layout_row_template_end(ctx);
+
+        nk_label_colored(ctx, "NIP", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Nama Guru", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "JK", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Mata Pelajaran", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Status", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+
+        nk_layout_row_dynamic(ctx, 1, 1);
+        nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+
+        for (int i = 0; i < g_teachers_count; i++) {
+            nk_layout_row_template_begin(ctx, 30);
+            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_push_static(ctx, 50);
+            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_push_static(ctx, 80);
+            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_end(ctx);
+
+            nk_label(ctx, g_teachers[i].nip, NK_TEXT_LEFT);
+            nk_label(ctx, g_teachers[i].name, NK_TEXT_LEFT);
+            nk_label(ctx, g_teachers[i].gender, NK_TEXT_LEFT);
+            nk_label(ctx, g_teachers[i].subject, NK_TEXT_LEFT);
+            nk_label(ctx, g_teachers[i].status, NK_TEXT_LEFT);
+
+            // Edit / Delete Buttons
+            nk_layout_row_dynamic(ctx, 22, 2);
+            if (nk_button_label(ctx, "Edit")) {
+                g_show_form = true;
+                g_is_editing = true;
+                g_editing_id = g_teachers[i].id;
+                strncpy(g_form_txt1, g_teachers[i].nip, sizeof(g_form_txt1) - 1);
+                strncpy(g_form_txt2, g_teachers[i].name, sizeof(g_form_txt2) - 1);
+                strncpy(g_form_txt3, g_teachers[i].subject, sizeof(g_form_txt3) - 1);
+                strncpy(g_form_txt4, g_teachers[i].phone, sizeof(g_form_txt4) - 1);
+                g_form_gender_idx = (strcmp(g_teachers[i].gender, "L") == 0) ? 0 : 1;
+                g_form_status_idx = (strcmp(g_teachers[i].status, "Aktif") == 0) ? 0 : (strcmp(g_teachers[i].status, "Cuti") == 0 ? 1 : 2);
+            }
+            if (nk_button_label(ctx, "Hapus")) {
+                if (db_delete_teacher(g_teachers[i].id)) {
+                    show_notification("Data guru berhasil dihapus.", true);
+                    load_tab_data(MENU_TEACHERS);
+                } else {
+                    show_notification("Gagal menghapus data guru!", false);
+                }
+            }
+        }
+    } else {
+        // Form Panel
+        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_label(ctx, g_is_editing ? "EDIT DATA GURU" : "TAMBAH GURU BARU", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 22, 2);
+        nk_label(ctx, "NIP", NK_TEXT_LEFT);
+        nk_label(ctx, "Nama Lengkap", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 30, 2);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt1, sizeof(g_form_txt1), nk_filter_decimal);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt2, sizeof(g_form_txt2), nk_filter_ascii);
+
+        nk_layout_row_dynamic(ctx, 22, 2);
+        nk_label(ctx, "Mata Pelajaran Binaan", NK_TEXT_LEFT);
+        nk_label(ctx, "Jenis Kelamin", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 30, 2);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt3, sizeof(g_form_txt3), nk_filter_ascii);
+        
+        const char *gender_options[] = {"Laki-laki (L)", "Perempuan (P)"};
+        g_form_gender_idx = nk_combo(ctx, gender_options, 2, g_form_gender_idx, 25, nk_vec2(200, 100));
+
+        nk_layout_row_dynamic(ctx, 22, 2);
+        nk_label(ctx, "Nomor Telepon", NK_TEXT_LEFT);
+        nk_label(ctx, "Status Keaktifan", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 30, 2);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt4, sizeof(g_form_txt4), nk_filter_decimal);
+        
+        const char *status_options[] = {"Aktif", "Cuti", "Pensiun"};
+        g_form_status_idx = nk_combo(ctx, status_options, 3, g_form_status_idx, 25, nk_vec2(200, 100));
+
+        nk_layout_row_dynamic(ctx, 20, 1); // Spacer
+
+        nk_layout_row_dynamic(ctx, 35, 2);
+        if (nk_button_label(ctx, "SIMPAN")) {
+            if (strlen(g_form_txt1) == 0 || strlen(g_form_txt2) == 0) {
+                show_notification("NIP dan Nama wajib diisi!", false);
+            } else {
+                Teacher t;
+                t.id = g_editing_id;
+                strncpy(t.nip, g_form_txt1, sizeof(t.nip) - 1);
+                strncpy(t.name, g_form_txt2, sizeof(t.name) - 1);
+                strncpy(t.subject, g_form_txt3, sizeof(t.subject) - 1);
+                strncpy(t.phone, g_form_txt4, sizeof(t.phone) - 1);
+                strncpy(t.gender, g_form_gender_idx == 0 ? "L" : "P", sizeof(t.gender) - 1);
+                
+                if (g_form_status_idx == 0) strncpy(t.status, "Aktif", sizeof(t.status) - 1);
+                else if (g_form_status_idx == 1) strncpy(t.status, "Cuti", sizeof(t.status) - 1);
+                else strncpy(t.status, "Pensiun", sizeof(t.status) - 1);
+
+                bool success = g_is_editing ? db_update_teacher(&t) : db_create_teacher(&t);
+                if (success) {
+                    show_notification("Data guru berhasil disimpan.", true);
+                    g_show_form = false;
+                    load_tab_data(MENU_TEACHERS);
+                } else {
+                    show_notification("Gagal menyimpan data guru (NIP unik)!", false);
+                }
+            }
+        }
+        if (nk_button_label(ctx, "BATAL")) {
+            g_show_form = false;
+        }
+    }
+}
+
+// SUB-SCREEN: Classes Tab
+static void draw_classes_tab(struct nk_context *ctx) {
+    nk_layout_row_dynamic(ctx, 30, 1);
+    nk_label_colored(ctx, "MANAJEMEN ROMBONGAN BELAJAR (KELAS)", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+
+    if (!g_show_form) {
+        nk_layout_row_template_begin(ctx, 35);
+        nk_layout_row_template_push_dynamic(ctx);
+        nk_layout_row_template_push_static(ctx, 180);
+        nk_layout_row_template_end(ctx);
+        
+        nk_spacing(ctx, 1);
+        if (nk_button_label(ctx, "+ TAMBAH ROMBEL KELAS")) {
+            g_show_form = true;
+            g_is_editing = false;
+            g_editing_id = 0;
+            g_form_txt1[0] = '\0'; // nama kelas
+            g_form_txt2[0] = '\0'; // tahun ajaran
+            g_form_int1 = 0;       // wali kelas index
+        }
+
+        nk_layout_row_dynamic(ctx, 15, 1); // Spacer
+
+        // Headers
+        nk_layout_row_template_begin(ctx, 25);
+        nk_layout_row_template_push_static(ctx, 150); // Nama Kelas
+        nk_layout_row_template_push_static(ctx, 120); // Tahun Ajaran
+        nk_layout_row_template_push_dynamic(ctx);     // Wali Kelas
+        nk_layout_row_template_push_static(ctx, 120); // Action Buttons
+        nk_layout_row_template_end(ctx);
+
+        nk_label_colored(ctx, "Nama Kelas / Rombel", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Tahun Ajaran", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Wali Kelas", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+
+        nk_layout_row_dynamic(ctx, 1, 1);
+        nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+
+        for (int i = 0; i < g_classes_count; i++) {
+            nk_layout_row_template_begin(ctx, 30);
+            nk_layout_row_template_push_static(ctx, 150);
+            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_end(ctx);
+
+            nk_label(ctx, g_classes[i].name, NK_TEXT_LEFT);
+            nk_label(ctx, g_classes[i].academic_year, NK_TEXT_LEFT);
+            nk_label(ctx, g_classes[i].teacher_name, NK_TEXT_LEFT);
+
+            nk_layout_row_dynamic(ctx, 22, 2);
+            if (nk_button_label(ctx, "Edit")) {
+                g_show_form = true;
+                g_is_editing = true;
+                g_editing_id = g_classes[i].id;
+                strncpy(g_form_txt1, g_classes[i].name, sizeof(g_form_txt1) - 1);
+                strncpy(g_form_txt2, g_classes[i].academic_year, sizeof(g_form_txt2) - 1);
+                
+                g_form_int1 = 0; // "Belum Ditentukan"
+                for (int t = 0; t < g_teachers_count; t++) {
+                    if (g_teachers[t].id == g_classes[i].teacher_id) {
+                        g_form_int1 = t + 1;
+                        break;
+                    }
+                }
+            }
+            if (nk_button_label(ctx, "Hapus")) {
+                if (db_delete_class(g_classes[i].id)) {
+                    show_notification("Data kelas berhasil dihapus.", true);
+                    load_tab_data(MENU_CLASSES);
+                } else {
+                    show_notification("Gagal menghapus kelas!", false);
+                }
+            }
+        }
+    } else {
+        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_label(ctx, g_is_editing ? "EDIT ROMBONGAN BELAJAR" : "TAMBAH ROMBONGAN BELAJAR", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 22, 2);
+        nk_label(ctx, "Nama Rombel / Kelas (e.g. Kelas 10-A)", NK_TEXT_LEFT);
+        nk_label(ctx, "Tahun Ajaran (e.g. 2025/2026)", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 30, 2);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt1, sizeof(g_form_txt1), nk_filter_ascii);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt2, sizeof(g_form_txt2), nk_filter_ascii);
+
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label(ctx, "Pilih Wali Kelas", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 30, 1);
+        const char *teacher_options[201];
+        teacher_options[0] = "-- Belum Ditentukan --";
+        for (int t = 0; t < g_teachers_count; t++) {
+            teacher_options[t + 1] = g_teachers[t].name;
+        }
+        g_form_int1 = nk_combo(ctx, teacher_options, g_teachers_count + 1, g_form_int1, 25, nk_vec2(300, 200));
+
+        nk_layout_row_dynamic(ctx, 20, 1); // Spacer
+
+        nk_layout_row_dynamic(ctx, 35, 2);
+        if (nk_button_label(ctx, "SIMPAN")) {
+            if (strlen(g_form_txt1) == 0 || strlen(g_form_txt2) == 0) {
+                show_notification("Nama Kelas dan Tahun Ajaran wajib diisi!", false);
+            } else {
+                ClassEntity c;
+                c.id = g_editing_id;
+                strncpy(c.name, g_form_txt1, sizeof(c.name) - 1);
+                strncpy(c.academic_year, g_form_txt2, sizeof(c.academic_year) - 1);
+                c.teacher_id = (g_form_int1 > 0) ? g_teachers[g_form_int1 - 1].id : 0;
+
+                bool success = g_is_editing ? db_update_class(&c) : db_create_class(&c);
+                if (success) {
+                    show_notification("Data rombel berhasil disimpan.", true);
+                    g_show_form = false;
+                    load_tab_data(MENU_CLASSES);
+                } else {
+                    show_notification("Gagal menyimpan data rombel!", false);
+                }
+            }
+        }
+        if (nk_button_label(ctx, "BATAL")) {
+            g_show_form = false;
+        }
+    }
+}
+
+// SUB-SCREEN: Attendance Tab
+static void draw_attendance_tab(struct nk_context *ctx) {
+    nk_layout_row_dynamic(ctx, 30, 1);
+    nk_label_colored(ctx, "PENCATATAN KEHADIRAN (ABSENSI SISWA)", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+
+    // Toolbar (Select Class & Date)
+    nk_layout_row_template_begin(ctx, 35);
+    nk_layout_row_template_push_static(ctx, 150); // Class dropdown
+    nk_layout_row_template_push_static(ctx, 120); // Date input
+    nk_layout_row_template_push_static(ctx, 100); // Load Button
+    nk_layout_row_template_push_static(ctx, 120); // Save Button
+    nk_layout_row_template_push_dynamic(ctx);     // Spacer
+    nk_layout_row_template_push_static(ctx, 120); // Export CSV
+    nk_layout_row_template_push_static(ctx, 120); // Export PDF
+    nk_layout_row_template_end(ctx);
+
+    const char *class_options[100];
+    for (int c = 0; c < g_classes_count; c++) {
+        class_options[c] = g_classes[c].name;
+    }
+    
+    if (g_classes_count > 0) {
+        g_selected_class_idx = nk_combo(ctx, class_options, g_classes_count, g_selected_class_idx, 25, nk_vec2(180, 200));
+    } else {
+        nk_label(ctx, "Belum ada kelas!", NK_TEXT_LEFT);
+    }
+    
+    nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_attendance_date, sizeof(g_attendance_date), nk_filter_ascii);
+    
+    if (nk_button_label(ctx, "Muat")) {
+        load_tab_data(MENU_ATTENDANCE);
+    }
+
+    if (nk_button_label(ctx, "SIMPAN SEMUA")) {
+        bool all_ok = true;
+        for (int i = 0; i < g_attendance_count; i++) {
+            if (!db_save_attendance(g_attendance[i].student_id, g_attendance_date, g_attendance[i].status, g_attendance[i].notes)) {
+                all_ok = false;
+            }
+        }
+        if (all_ok) {
+            show_notification("Absensi berhasil disimpan ke database.", true);
+            db_get_dashboard_stats(&g_stats); // update stats
+        } else {
+            show_notification("Gagal menyimpan beberapa absensi!", false);
+        }
+    }
+
+    nk_spacing(ctx, 1);
+    
+    if (nk_button_label(ctx, "Ekspor CSV")) {
+        if (g_classes_count > 0) {
+            char filename[128];
+            snprintf(filename, sizeof(filename), "absensi_%s_%s.csv", g_classes[g_selected_class_idx].name, g_attendance_date);
+            if (service_export_attendance_csv(filename, g_attendance_date, g_classes[g_selected_class_idx].id, g_classes[g_selected_class_idx].name)) {
+                show_notification("CSV berhasil diekspor!", true);
+            } else {
+                show_notification("Gagal ekspor CSV!", false);
+            }
+        }
+    }
+
+    if (nk_button_label(ctx, "Ekspor PDF")) {
+        if (g_classes_count > 0) {
+            char filename[128];
+            snprintf(filename, sizeof(filename), "absensi_%s_%s.pdf", g_classes[g_selected_class_idx].name, g_attendance_date);
+            if (service_export_attendance_pdf(filename, g_attendance_date, g_classes[g_selected_class_idx].id, g_classes[g_selected_class_idx].name)) {
+                show_notification("PDF berhasil diekspor!", true);
+            } else {
+                show_notification("Gagal ekspor PDF!", false);
+            }
+        }
+    }
+
+    nk_layout_row_dynamic(ctx, 15, 1); // Spacer
+
+    // Attendance Table Sheet
+    nk_layout_row_template_begin(ctx, 25);
+    nk_layout_row_template_push_dynamic(ctx);     // Nama Siswa
+    nk_layout_row_template_push_static(ctx, 200); // Attendance Status buttons
+    nk_layout_row_template_push_static(ctx, 200); // Keterangan / Notes
+    nk_layout_row_template_end(ctx);
+
+    nk_label_colored(ctx, "Nama Siswa", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+    nk_label_colored(ctx, "Status Kehadiran (H | S | I | A)", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+    nk_label_colored(ctx, "Catatan / Keterangan", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+
+    nk_layout_row_dynamic(ctx, 1, 1);
+    nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+
+    for (int i = 0; i < g_attendance_count; i++) {
+        nk_layout_row_template_begin(ctx, 35);
+        nk_layout_row_template_push_dynamic(ctx);
+        nk_layout_row_template_push_static(ctx, 200);
+        nk_layout_row_template_push_static(ctx, 200);
+        nk_layout_row_template_end(ctx);
+
+        nk_label(ctx, g_attendance[i].student_name, NK_TEXT_LEFT);
+
+        // Status Choice: horizontal radio buttons or similar
+        // Let's do horizontal radio/combo options
+        nk_layout_row_dynamic(ctx, 25, 4);
+        if (nk_option_label(ctx, "H", g_attendance[i].status == ATT_HADIR)) g_attendance[i].status = ATT_HADIR;
+        if (nk_option_label(ctx, "S", g_attendance[i].status == ATT_SAKIT)) g_attendance[i].status = ATT_SAKIT;
+        if (nk_option_label(ctx, "I", g_attendance[i].status == ATT_IZIN)) g_attendance[i].status = ATT_IZIN;
+        if (nk_option_label(ctx, "A", g_attendance[i].status == ATT_ALPA)) g_attendance[i].status = ATT_ALPA;
+
+        nk_layout_row_dynamic(ctx, 25, 1);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_attendance[i].notes, sizeof(g_attendance[i].notes), nk_filter_ascii);
+    }
+}
+
+// SUB-SCREEN: Academic (CP / TP / ATP)
+static void draw_academic_tab(struct nk_context *ctx) {
+    nk_layout_row_dynamic(ctx, 30, 1);
+    nk_label_colored(ctx, "KURIKULUM (CP, TP, ATP)", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+
+    // Show 3 distinct sections or tabs using Nuklear groups or simple header buttons
+    static int sub_tab = 0; // 0=CP, 1=TP, 2=ATP
+    nk_layout_row_dynamic(ctx, 30, 3);
+    if (nk_button_label(ctx, "Capaian Pembelajaran (CP)")) sub_tab = 0;
+    if (nk_button_label(ctx, "Tujuan Pembelajaran (TP)")) sub_tab = 1;
+    if (nk_button_label(ctx, "Alur Tujuan Pembelajaran (ATP)")) sub_tab = 2;
+
+    nk_layout_row_dynamic(ctx, 15, 1); // Spacer
+
+    if (sub_tab == 0) {
+        // CP Section
+        if (!g_show_form) {
+            nk_layout_row_template_begin(ctx, 35);
+            nk_layout_row_template_push_static(ctx, 150); // Search bar
+            nk_layout_row_template_push_static(ctx, 80);  // Search btn
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_push_static(ctx, 150); // Add btn
+            nk_layout_row_template_end(ctx);
+
+            nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_search_query, sizeof(g_search_query), nk_filter_ascii);
+            if (nk_button_label(ctx, "Cari")) load_tab_data(MENU_ACADEMIC);
+            nk_spacing(ctx, 1);
+            if (nk_button_label(ctx, "+ TAMBAH CP")) {
+                g_show_form = true;
+                g_is_editing = false;
+                g_editing_id = 0;
+                g_form_txt1[0] = '\0'; // Kode
+                g_form_txt2[0] = '\0'; // Subject
+                g_form_txt3[0] = '\0'; // Description
+            }
+
+            nk_layout_row_dynamic(ctx, 15, 1); // Spacer
+
+            nk_layout_row_template_begin(ctx, 25);
+            nk_layout_row_template_push_static(ctx, 100);
+            nk_layout_row_template_push_static(ctx, 150);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_end(ctx);
+
+            nk_label_colored(ctx, "Kode CP", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+            nk_label_colored(ctx, "Mata Pelajaran", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+            nk_label_colored(ctx, "Deskripsi Kompetensi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+            nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+
+            nk_layout_row_dynamic(ctx, 1, 1);
+            nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+
+            for (int i = 0; i < g_cp_count; i++) {
+                nk_layout_row_template_begin(ctx, 35);
+                nk_layout_row_template_push_static(ctx, 100);
+                nk_layout_row_template_push_static(ctx, 150);
+                nk_layout_row_template_push_dynamic(ctx);
+                nk_layout_row_template_push_static(ctx, 120);
+                nk_layout_row_template_end(ctx);
+
+                nk_label(ctx, g_cp[i].code, NK_TEXT_LEFT);
+                nk_label(ctx, g_cp[i].subject, NK_TEXT_LEFT);
+                nk_label(ctx, g_cp[i].description, NK_TEXT_LEFT);
+
+                nk_layout_row_dynamic(ctx, 22, 2);
+                if (nk_button_label(ctx, "Edit")) {
+                    g_show_form = true;
+                    g_is_editing = true;
+                    g_editing_id = g_cp[i].id;
+                    strncpy(g_form_txt1, g_cp[i].code, sizeof(g_form_txt1) - 1);
+                    strncpy(g_form_txt2, g_cp[i].subject, sizeof(g_form_txt2) - 1);
+                    strncpy(g_form_txt3, g_cp[i].description, sizeof(g_form_txt3) - 1);
+                }
+                if (nk_button_label(ctx, "Hapus")) {
+                    if (db_delete_cp(g_cp[i].id)) {
+                        show_notification("CP berhasil dihapus.", true);
+                        load_tab_data(MENU_ACADEMIC);
+                    } else {
+                        show_notification("Gagal menghapus CP!", false);
+                    }
+                }
+            }
+        } else {
+            // Add/Edit CP Form
+            nk_layout_row_dynamic(ctx, 30, 1);
+            nk_label(ctx, g_is_editing ? "EDIT CAPAIAN PEMBELAJARAN" : "TAMBAH CAPAIAN PEMBELAJARAN", NK_TEXT_LEFT);
+
+            nk_layout_row_dynamic(ctx, 22, 2);
+            nk_label(ctx, "Kode CP (e.g. CP-MTK-01)", NK_TEXT_LEFT);
+            nk_label(ctx, "Mata Pelajaran", NK_TEXT_LEFT);
+
+            nk_layout_row_dynamic(ctx, 30, 2);
+            nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt1, sizeof(g_form_txt1), nk_filter_ascii);
+            nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt2, sizeof(g_form_txt2), nk_filter_ascii);
+
+            nk_layout_row_dynamic(ctx, 22, 1);
+            nk_label(ctx, "Deskripsi CP", NK_TEXT_LEFT);
+
+            nk_layout_row_dynamic(ctx, 60, 1);
+            nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX, g_form_txt3, sizeof(g_form_txt3), nk_filter_ascii);
+
+            nk_layout_row_dynamic(ctx, 20, 1); // Spacer
+
+            nk_layout_row_dynamic(ctx, 35, 2);
+            if (nk_button_label(ctx, "SIMPAN")) {
+                if (strlen(g_form_txt1) == 0 || strlen(g_form_txt3) == 0) {
+                    show_notification("Kode CP dan Deskripsi wajib diisi!", false);
+                } else {
+                    CapaianPembelajaran cp;
+                    cp.id = g_editing_id;
+                    strncpy(cp.code, g_form_txt1, sizeof(cp.code) - 1);
+                    strncpy(cp.subject, g_form_txt2, sizeof(cp.subject) - 1);
+                    strncpy(cp.description, g_form_txt3, sizeof(cp.description) - 1);
+
+                    bool success = g_is_editing ? db_update_cp(&cp) : db_create_cp(&cp);
+                    if (success) {
+                        show_notification("CP berhasil disimpan.", true);
+                        g_show_form = false;
+                        load_tab_data(MENU_ACADEMIC);
+                    } else {
+                        show_notification("Gagal menyimpan CP (Kode unik)!", false);
+                    }
+                }
+            }
+            if (nk_button_label(ctx, "BATAL")) g_show_form = false;
+        }
+    }
+    else if (sub_tab == 1) {
+        // TP Section
+        if (!g_show_form) {
+            nk_layout_row_template_begin(ctx, 35);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_push_static(ctx, 150);
+            nk_layout_row_template_end(ctx);
+
+            nk_spacing(ctx, 1);
+            if (nk_button_label(ctx, "+ TAMBAH TP")) {
+                g_show_form = true;
+                g_is_editing = false;
+                g_editing_id = 0;
+                g_form_txt1[0] = '\0'; // Kode
+                g_form_txt2[0] = '\0'; // Description
+                g_form_int1 = 0;       // CP index
+            }
+
+            nk_layout_row_dynamic(ctx, 15, 1);
+
+            nk_layout_row_template_begin(ctx, 25);
+            nk_layout_row_template_push_static(ctx, 100);
+            nk_layout_row_template_push_static(ctx, 100);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_end(ctx);
+
+            nk_label_colored(ctx, "Kode TP", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+            nk_label_colored(ctx, "CP Binaan", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+            nk_label_colored(ctx, "Tujuan Pembelajaran (TP)", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+            nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+
+            nk_layout_row_dynamic(ctx, 1, 1);
+            nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+
+            for (int i = 0; i < g_tp_count; i++) {
+                nk_layout_row_template_begin(ctx, 35);
+                nk_layout_row_template_push_static(ctx, 100);
+                nk_layout_row_template_push_static(ctx, 100);
+                nk_layout_row_template_push_dynamic(ctx);
+                nk_layout_row_template_push_static(ctx, 120);
+                nk_layout_row_template_end(ctx);
+
+                nk_label(ctx, g_tp[i].code, NK_TEXT_LEFT);
+                nk_label(ctx, g_tp[i].cp_code, NK_TEXT_LEFT);
+                nk_label(ctx, g_tp[i].description, NK_TEXT_LEFT);
+
+                nk_layout_row_dynamic(ctx, 22, 2);
+                if (nk_button_label(ctx, "Edit")) {
+                    g_show_form = true;
+                    g_is_editing = true;
+                    g_editing_id = g_tp[i].id;
+                    strncpy(g_form_txt1, g_tp[i].code, sizeof(g_form_txt1) - 1);
+                    strncpy(g_form_txt2, g_tp[i].description, sizeof(g_form_txt2) - 1);
+                    
+                    g_form_int1 = 0;
+                    for (int cp = 0; cp < g_cp_count; cp++) {
+                        if (g_cp[cp].id == g_tp[i].cp_id) {
+                            g_form_int1 = cp;
+                            break;
+                        }
+                    }
+                }
+                if (nk_button_label(ctx, "Hapus")) {
+                    if (db_delete_tp(g_tp[i].id)) {
+                        show_notification("TP berhasil dihapus.", true);
+                        load_tab_data(MENU_ACADEMIC);
+                    } else {
+                        show_notification("Gagal menghapus TP!", false);
+                    }
+                }
+            }
+        } else {
+            nk_layout_row_dynamic(ctx, 30, 1);
+            nk_label(ctx, g_is_editing ? "EDIT TUJUAN PEMBELAJARAN" : "TAMBAH TUJUAN PEMBELAJARAN", NK_TEXT_LEFT);
+
+            nk_layout_row_dynamic(ctx, 22, 2);
+            nk_label(ctx, "Pilih Capaian Pembelajaran (CP) Terkait", NK_TEXT_LEFT);
+            nk_label(ctx, "Kode TP (e.g. TP-MTK-01a)", NK_TEXT_LEFT);
+
+            nk_layout_row_dynamic(ctx, 30, 2);
+            const char *cp_options[200];
+            for (int cp = 0; cp < g_cp_count; cp++) {
+                cp_options[cp] = g_cp[cp].code;
+            }
+            if (g_cp_count > 0) {
+                g_form_int1 = nk_combo(ctx, cp_options, g_cp_count, g_form_int1, 25, nk_vec2(250, 180));
+            } else {
+                nk_label(ctx, "Buat CP dahulu!", NK_TEXT_LEFT);
+            }
+            nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt1, sizeof(g_form_txt1), nk_filter_ascii);
+
+            nk_layout_row_dynamic(ctx, 22, 1);
+            nk_label(ctx, "Deskripsi Kompetensi TP", NK_TEXT_LEFT);
+
+            nk_layout_row_dynamic(ctx, 60, 1);
+            nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX, g_form_txt2, sizeof(g_form_txt2), nk_filter_ascii);
+
+            nk_layout_row_dynamic(ctx, 20, 1);
+
+            nk_layout_row_dynamic(ctx, 35, 2);
+            if (nk_button_label(ctx, "SIMPAN")) {
+                if (g_cp_count == 0 || strlen(g_form_txt1) == 0 || strlen(g_form_txt2) == 0) {
+                    show_notification("Pilih CP, isi Kode & Deskripsi TP!", false);
+                } else {
+                    TujuanPembelajaran tp;
+                    tp.id = g_editing_id;
+                    tp.cp_id = g_cp[g_form_int1].id;
+                    strncpy(tp.code, g_form_txt1, sizeof(tp.code) - 1);
+                    strncpy(tp.description, g_form_txt2, sizeof(tp.description) - 1);
+
+                    bool success = g_is_editing ? db_update_tp(&tp) : db_create_tp(&tp);
+                    if (success) {
+                        show_notification("TP berhasil disimpan.", true);
+                        g_show_form = false;
+                        load_tab_data(MENU_ACADEMIC);
+                    } else {
+                        show_notification("Gagal menyimpan TP (Kode unik)!", false);
+                    }
+                }
+            }
+            if (nk_button_label(ctx, "BATAL")) g_show_form = false;
+        }
+    }
+    else {
+        // ATP Section
+        if (!g_show_form) {
+            nk_layout_row_template_begin(ctx, 35);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_push_static(ctx, 150);
+            nk_layout_row_template_end(ctx);
+
+            nk_spacing(ctx, 1);
+            if (nk_button_label(ctx, "+ TAMBAH ALUR (ATP)")) {
+                g_show_form = true;
+                g_is_editing = false;
+                g_editing_id = 0;
+                g_form_txt1[0] = '\0'; // Description
+                g_form_int1 = 0;       // TP index
+                g_form_status_idx = 1; // Order number (using status_idx helper)
+            }
+
+            nk_layout_row_dynamic(ctx, 15, 1);
+
+            nk_layout_row_template_begin(ctx, 25);
+            nk_layout_row_template_push_static(ctx, 80);  // Order
+            nk_layout_row_template_push_static(ctx, 100); // TP code
+            nk_layout_row_template_push_dynamic(ctx);     // ATP description
+            nk_layout_row_template_push_static(ctx, 120); // Action Buttons
+            nk_layout_row_template_end(ctx);
+
+            nk_label_colored(ctx, "No Urut", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+            nk_label_colored(ctx, "Kode TP", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+            nk_label_colored(ctx, "Deskripsi Alur Pembelajaran (ATP)", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+            nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+
+            nk_layout_row_dynamic(ctx, 1, 1);
+            nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+
+            for (int i = 0; i < g_atp_count; i++) {
+                nk_layout_row_template_begin(ctx, 35);
+                nk_layout_row_template_push_static(ctx, 80);
+                nk_layout_row_template_push_static(ctx, 100);
+                nk_layout_row_template_push_dynamic(ctx);
+                nk_layout_row_template_push_static(ctx, 120);
+                nk_layout_row_template_end(ctx);
+
+                char ord_str[20];
+                snprintf(ord_str, sizeof(ord_str), "Alur %d", g_atp[i].order_num);
+                nk_label(ctx, ord_str, NK_TEXT_LEFT);
+                nk_label(ctx, g_atp[i].tp_code, NK_TEXT_LEFT);
+                nk_label(ctx, g_atp[i].description, NK_TEXT_LEFT);
+
+                nk_layout_row_dynamic(ctx, 22, 2);
+                if (nk_button_label(ctx, "Edit")) {
+                    g_show_form = true;
+                    g_is_editing = true;
+                    g_editing_id = g_atp[i].id;
+                    strncpy(g_form_txt1, g_atp[i].description, sizeof(g_form_txt1) - 1);
+                    g_form_status_idx = g_atp[i].order_num;
+                    
+                    g_form_int1 = 0;
+                    for (int tp = 0; tp < g_tp_count; tp++) {
+                        if (g_tp[tp].id == g_atp[i].tp_id) {
+                            g_form_int1 = tp;
+                            break;
+                        }
+                    }
+                }
+                if (nk_button_label(ctx, "Hapus")) {
+                    if (db_delete_atp(g_atp[i].id)) {
+                        show_notification("Alur ATP berhasil dihapus.", true);
+                        load_tab_data(MENU_ACADEMIC);
+                    } else {
+                        show_notification("Gagal menghapus ATP!", false);
+                    }
+                }
+            }
+        } else {
+            nk_layout_row_dynamic(ctx, 30, 1);
+            nk_label(ctx, g_is_editing ? "EDIT ALUR TUJUAN PEMBELAJARAN" : "TAMBAH ALUR TUJUAN PEMBELAJARAN", NK_TEXT_LEFT);
+
+            nk_layout_row_dynamic(ctx, 22, 2);
+            nk_label(ctx, "Pilih Tujuan Pembelajaran (TP) Terkait", NK_TEXT_LEFT);
+            nk_label(ctx, "No Urut Urutan", NK_TEXT_LEFT);
+
+            nk_layout_row_dynamic(ctx, 30, 2);
+            const char *tp_options[300];
+            for (int tp = 0; tp < g_tp_count; tp++) {
+                tp_options[tp] = g_tp[tp].code;
+            }
+            if (g_tp_count > 0) {
+                g_form_int1 = nk_combo(ctx, tp_options, g_tp_count, g_form_int1, 25, nk_vec2(250, 180));
+            } else {
+                nk_label(ctx, "Buat TP dahulu!", NK_TEXT_LEFT);
+            }
+            // Simple integer entry for order
+            nk_property_int(ctx, "Urutan #", 1, &g_form_status_idx, 100, 1, 1);
+
+            nk_layout_row_dynamic(ctx, 22, 1);
+            nk_label(ctx, "Deskripsi Langkah Alur / Skenario ATP", NK_TEXT_LEFT);
+
+            nk_layout_row_dynamic(ctx, 60, 1);
+            nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX, g_form_txt1, sizeof(g_form_txt1), nk_filter_ascii);
+
+            nk_layout_row_dynamic(ctx, 20, 1);
+
+            nk_layout_row_dynamic(ctx, 35, 2);
+            if (nk_button_label(ctx, "SIMPAN")) {
+                if (g_tp_count == 0 || strlen(g_form_txt1) == 0) {
+                    show_notification("Pilih TP dan isi Deskripsi ATP!", false);
+                } else {
+                    AlurTujuanPembelajaran atp;
+                    atp.id = g_editing_id;
+                    atp.tp_id = g_tp[g_form_int1].id;
+                    atp.order_num = g_form_status_idx;
+                    strncpy(atp.description, g_form_txt1, sizeof(atp.description) - 1);
+
+                    bool success = g_is_editing ? db_update_atp(&atp) : db_create_atp(&atp);
+                    if (success) {
+                        show_notification("ATP berhasil disimpan.", true);
+                        g_show_form = false;
+                        load_tab_data(MENU_ACADEMIC);
+                    } else {
+                        show_notification("Gagal menyimpan ATP!", false);
+                    }
+                }
+            }
+            if (nk_button_label(ctx, "BATAL")) g_show_form = false;
+        }
+    }
+}
+
+// SUB-SCREEN: Daily Journal
+static void draw_journal_tab(struct nk_context *ctx) {
+    nk_layout_row_dynamic(ctx, 30, 1);
+    nk_label_colored(ctx, "JURNAL HARIAN GURU & AKTIVITAS ROMBEL", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+
+    if (!g_show_form) {
+        nk_layout_row_template_begin(ctx, 35);
+        nk_layout_row_template_push_static(ctx, 120); // Date filter
+        nk_layout_row_template_push_static(ctx, 80);  // Filter btn
+        nk_layout_row_template_push_dynamic(ctx);
+        nk_layout_row_template_push_static(ctx, 150); // Add btn
+        nk_layout_row_template_end(ctx);
+
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_attendance_date, sizeof(g_attendance_date), nk_filter_ascii);
+        if (nk_button_label(ctx, "Filter")) load_tab_data(MENU_JOURNAL);
+        nk_spacing(ctx, 1);
+        if (nk_button_label(ctx, "+ BUAT JURNAL")) {
+            g_show_form = true;
+            g_is_editing = false;
+            g_editing_id = 0;
+            g_form_txt1[0] = '\0'; // activity
+            g_form_txt2[0] = '\0'; // notes
+            g_form_int1 = 0;       // teacher idx
+            g_form_gender_idx = 0; // class idx
+            get_today_date(g_form_txt3, sizeof(g_form_txt3)); // date
+        }
+
+        nk_layout_row_dynamic(ctx, 15, 1);
+
+        nk_layout_row_template_begin(ctx, 25);
+        nk_layout_row_template_push_static(ctx, 90);  // Date
+        nk_layout_row_template_push_static(ctx, 120); // Teacher
+        nk_layout_row_template_push_static(ctx, 80);  // Class
+        nk_layout_row_template_push_dynamic(ctx);     // Activity
+        nk_layout_row_template_push_static(ctx, 120); // Action Buttons
+        nk_layout_row_template_end(ctx);
+
+        nk_label_colored(ctx, "Tanggal", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Guru Pelapor", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Kelas", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Aktivitas Pembelajaran", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+
+        nk_layout_row_dynamic(ctx, 1, 1);
+        nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+
+        for (int i = 0; i < g_journals_count; i++) {
+            nk_layout_row_template_begin(ctx, 35);
+            nk_layout_row_template_push_static(ctx, 90);
+            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_push_static(ctx, 80);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_end(ctx);
+
+            nk_label(ctx, g_journals[i].date, NK_TEXT_LEFT);
+            nk_label(ctx, g_journals[i].teacher_name, NK_TEXT_LEFT);
+            nk_label(ctx, g_journals[i].class_name, NK_TEXT_LEFT);
+            nk_label(ctx, g_journals[i].activity, NK_TEXT_LEFT);
+
+            nk_layout_row_dynamic(ctx, 22, 2);
+            if (nk_button_label(ctx, "Edit")) {
+                g_show_form = true;
+                g_is_editing = true;
+                g_editing_id = g_journals[i].id;
+                strncpy(g_form_txt1, g_journals[i].activity, sizeof(g_form_txt1) - 1);
+                strncpy(g_form_txt2, g_journals[i].notes, sizeof(g_form_txt2) - 1);
+                strncpy(g_form_txt3, g_journals[i].date, sizeof(g_form_txt3) - 1);
+                
+                g_form_int1 = 0;
+                for (int t = 0; t < g_teachers_count; t++) {
+                    if (g_teachers[t].id == g_journals[i].teacher_id) {
+                        g_form_int1 = t;
+                        break;
+                    }
+                }
+                g_form_gender_idx = 0;
+                for (int c = 0; c < g_classes_count; c++) {
+                    if (g_classes[c].id == g_journals[i].class_id) {
+                        g_form_gender_idx = c;
+                        break;
+                    }
+                }
+            }
+            if (nk_button_label(ctx, "Hapus")) {
+                if (db_delete_journal(g_journals[i].id)) {
+                    show_notification("Jurnal harian berhasil dihapus.", true);
+                    load_tab_data(MENU_JOURNAL);
+                } else {
+                    show_notification("Gagal menghapus jurnal!", false);
+                }
+            }
+        }
+    } else {
+        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_label(ctx, g_is_editing ? "EDIT JURNAL AKTIVITAS" : "TAMBAH JURNAL HARIAN", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 22, 3);
+        nk_label(ctx, "Pilih Guru", NK_TEXT_LEFT);
+        nk_label(ctx, "Pilih Kelas", NK_TEXT_LEFT);
+        nk_label(ctx, "Tanggal (YYYY-MM-DD)", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 30, 3);
+        const char *teacher_options[200];
+        for (int t = 0; t < g_teachers_count; t++) teacher_options[t] = g_teachers[t].name;
+        if (g_teachers_count > 0) {
+            g_form_int1 = nk_combo(ctx, teacher_options, g_teachers_count, g_form_int1, 25, nk_vec2(200, 180));
+        } else {
+            nk_label(ctx, "Buat data Guru dahulu!", NK_TEXT_LEFT);
+        }
+
+        const char *class_options[100];
+        for (int c = 0; c < g_classes_count; c++) class_options[c] = g_classes[c].name;
+        if (g_classes_count > 0) {
+            g_form_gender_idx = nk_combo(ctx, class_options, g_classes_count, g_form_gender_idx, 25, nk_vec2(200, 180));
+        } else {
+            nk_label(ctx, "Buat data Kelas dahulu!", NK_TEXT_LEFT);
+        }
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt3, sizeof(g_form_txt3), nk_filter_ascii);
+
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label(ctx, "Aktivitas & Materi Pokok Pembelajaran", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 50, 1);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX, g_form_txt1, sizeof(g_form_txt1), nk_filter_ascii);
+
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label(ctx, "Catatan Kejadian Khusus (Optional)", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 40, 1);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX, g_form_txt2, sizeof(g_form_txt2), nk_filter_ascii);
+
+        nk_layout_row_dynamic(ctx, 20, 1);
+
+        nk_layout_row_dynamic(ctx, 35, 2);
+        if (nk_button_label(ctx, "SIMPAN")) {
+            if (g_teachers_count == 0 || g_classes_count == 0 || strlen(g_form_txt1) == 0 || strlen(g_form_txt3) == 0) {
+                show_notification("Lengkapi semua isian utama!", false);
+            } else {
+                DailyJournal j;
+                j.id = g_editing_id;
+                j.teacher_id = g_teachers[g_form_int1].id;
+                j.class_id = g_classes[g_form_gender_idx].id;
+                strncpy(j.date, g_form_txt3, sizeof(j.date) - 1);
+                strncpy(j.activity, g_form_txt1, sizeof(j.activity) - 1);
+                strncpy(j.notes, g_form_txt2, sizeof(j.notes) - 1);
+
+                bool success = g_is_editing ? db_update_journal(&j) : db_create_journal(&j);
+                if (success) {
+                    show_notification("Jurnal harian berhasil disimpan.", true);
+                    g_show_form = false;
+                    load_tab_data(MENU_JOURNAL);
+                } else {
+                    show_notification("Gagal menyimpan jurnal harian!", false);
+                }
+            }
+        }
+        if (nk_button_label(ctx, "BATAL")) g_show_form = false;
+    }
+}
+
+// SUB-SCREEN: Grades Tab
+static void draw_grades_tab(struct nk_context *ctx) {
+    nk_layout_row_dynamic(ctx, 30, 1);
+    nk_label_colored(ctx, "MANAJEMEN NILAI BELAJAR SISWA & TRANSKRIP", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+
+    // Choose Student and Load their specific grades
+    nk_layout_row_template_begin(ctx, 35);
+    nk_layout_row_template_push_static(ctx, 220); // Student select Combo
+    nk_layout_row_template_push_static(ctx, 80);  // Load btn
+    nk_layout_row_template_push_dynamic(ctx);     // Spacer
+    nk_layout_row_template_push_static(ctx, 130); // Export CSV
+    nk_layout_row_template_push_static(ctx, 130); // Export PDF
+    nk_layout_row_template_end(ctx);
+
+    const char *student_options[500];
+    for (int s = 0; s < g_students_count; s++) {
+        student_options[s] = g_students[s].name;
+    }
+    if (g_students_count > 0) {
+        g_selected_student_idx = nk_combo(ctx, student_options, g_students_count, g_selected_student_idx, 25, nk_vec2(220, 200));
+    } else {
+        nk_label(ctx, "Tidak ada Siswa!", NK_TEXT_LEFT);
+    }
+    
+    if (nk_button_label(ctx, "Tampilkan")) {
+        load_tab_data(MENU_GRADES);
+    }
+    
+    nk_spacing(ctx, 1);
+
+    if (nk_button_label(ctx, "Ekspor CSV")) {
+        if (g_students_count > 0) {
+            char filename[128];
+            snprintf(filename, sizeof(filename), "nilai_%s.csv", g_students[g_selected_student_idx].name);
+            if (service_export_grades_csv(filename, g_students[g_selected_student_idx].id, g_students[g_selected_student_idx].name)) {
+                show_notification("CSV Transkrip berhasil diekspor!", true);
+            } else {
+                show_notification("Gagal ekspor CSV!", false);
+            }
+        }
+    }
+
+    if (nk_button_label(ctx, "Ekspor PDF")) {
+        if (g_students_count > 0) {
+            char filename[128];
+            snprintf(filename, sizeof(filename), "nilai_%s.pdf", g_students[g_selected_student_idx].name);
+            if (service_export_grades_pdf(filename, g_students[g_selected_student_idx].id, g_students[g_selected_student_idx].name)) {
+                show_notification("PDF Transkrip berhasil diekspor!", true);
+            } else {
+                show_notification("Gagal ekspor PDF!", false);
+            }
+        }
+    }
+
+    nk_layout_row_dynamic(ctx, 20, 1); // Spacer
+
+    if (g_students_count == 0) return;
+
+    // Two-Column Grid: Left Column is Grade Entry Forms, Right Column is Grade Display Tables
+    nk_layout_row_dynamic(ctx, 350, 2);
+
+    // Left Column: Entry Form Group
+    if (nk_group_begin(ctx, "InputGradesGroup", NK_WINDOW_BORDER)) {
+        static int grade_form_type = 0; // 0=Daily, 1=Exam
+        nk_layout_row_dynamic(ctx, 30, 2);
+        if (nk_option_label(ctx, "Nilai Harian (TP)", grade_form_type == 0)) grade_form_type = 0;
+        if (nk_option_label(ctx, "Nilai Ujian (Sumatif)", grade_form_type == 1)) grade_form_type = 1;
+
+        nk_layout_row_dynamic(ctx, 10, 1); // Spacer
+
+        if (grade_form_type == 0) {
+            // Daily Grade Form (Student + TP + Score + Notes + Date)
+            nk_layout_row_dynamic(ctx, 20, 1);
+            nk_label_colored(ctx, "INPUT NILAI HARIAN SISWA", NK_TEXT_LEFT, nk_rgb(62, 141, 240));
+
+            nk_layout_row_dynamic(ctx, 22, 1);
+            nk_label(ctx, "Pilih Tujuan Pembelajaran (TP)", NK_TEXT_LEFT);
+            nk_layout_row_dynamic(ctx, 30, 1);
+            const char *tp_options[300];
+            for (int t = 0; t < g_tp_count; t++) tp_options[t] = g_tp[t].code;
+            if (g_tp_count > 0) {
+                g_selected_tp_idx = nk_combo(ctx, tp_options, g_tp_count, g_selected_tp_idx, 25, nk_vec2(250, 200));
+            } else {
+                nk_label(ctx, "Buat TP dahulu!", NK_TEXT_LEFT);
+            }
+
+            nk_layout_row_dynamic(ctx, 22, 2);
+            nk_label(ctx, "Nilai Angka (0-100)", NK_TEXT_LEFT);
+            nk_label(ctx, "Tanggal (YYYY-MM-DD)", NK_TEXT_LEFT);
+
+            nk_layout_row_dynamic(ctx, 30, 2);
+            nk_property_double(ctx, "Score", 0.0, &g_form_dbl1, 100.0, 1.0, 1.0);
+            nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_attendance_date, sizeof(g_attendance_date), nk_filter_ascii);
+
+            nk_layout_row_dynamic(ctx, 22, 1);
+            nk_label(ctx, "Catatan Kompetensi", NK_TEXT_LEFT);
+            nk_layout_row_dynamic(ctx, 30, 1);
+            nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt1, sizeof(g_form_txt1), nk_filter_ascii);
+
+            nk_layout_row_dynamic(ctx, 15, 1);
+
+            nk_layout_row_dynamic(ctx, 35, 1);
+            if (nk_button_label(ctx, "SIMPAN NILAI HARIAN")) {
+                if (g_tp_count == 0 || strlen(g_attendance_date) == 0) {
+                    show_notification("Lengkapi TP dan Tanggal!", false);
+                } else {
+                    int stud_id = g_students[g_selected_student_idx].id;
+                    int tp_id = g_tp[g_selected_tp_idx].id;
+                    if (db_save_daily_grade(stud_id, tp_id, g_form_dbl1, g_attendance_date, g_form_txt1)) {
+                        show_notification("Nilai harian berhasil disimpan.", true);
+                        load_tab_data(MENU_GRADES);
+                    } else {
+                        show_notification("Gagal menyimpan nilai harian!", false);
+                    }
+                }
+            }
+        } else {
+            // Exam Grade Form
+            nk_layout_row_dynamic(ctx, 20, 1);
+            nk_label_colored(ctx, "INPUT NILAI UJIAN SEMESTER", NK_TEXT_LEFT, nk_rgb(62, 141, 240));
+
+            nk_layout_row_dynamic(ctx, 22, 2);
+            nk_label(ctx, "Mata Pelajaran", NK_TEXT_LEFT);
+            nk_label(ctx, "Jenis Evaluasi", NK_TEXT_LEFT);
+
+            nk_layout_row_dynamic(ctx, 30, 2);
+            nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_subject_filter, sizeof(g_subject_filter), nk_filter_ascii);
+            
+            const char *exam_options[] = {"UTS (Tengah Semester)", "UAS (Akhir Semester)"};
+            g_form_int1 = nk_combo(ctx, exam_options, 2, g_form_int1, 25, nk_vec2(200, 100));
+
+            nk_layout_row_dynamic(ctx, 22, 2);
+            nk_label(ctx, "Nilai Angka (0-100)", NK_TEXT_LEFT);
+            nk_label(ctx, "Tanggal Pelaksanaan", NK_TEXT_LEFT);
+
+            nk_layout_row_dynamic(ctx, 30, 2);
+            nk_property_double(ctx, "Score", 0.0, &g_form_dbl1, 100.0, 1.0, 1.0);
+            nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_attendance_date, sizeof(g_attendance_date), nk_filter_ascii);
+
+            nk_layout_row_dynamic(ctx, 20, 1);
+
+            nk_layout_row_dynamic(ctx, 35, 1);
+            if (nk_button_label(ctx, "SIMPAN NILAI UJIAN")) {
+                if (strlen(g_subject_filter) == 0 || strlen(g_attendance_date) == 0) {
+                    show_notification("Lengkapi Mapel dan Tanggal!", false);
+                } else {
+                    int stud_id = g_students[g_selected_student_idx].id;
+                    ExamType etype = (g_form_int1 == 0) ? EXAM_UTS : EXAM_UAS;
+                    if (db_save_exam_grade(stud_id, g_subject_filter, etype, g_form_dbl1, g_attendance_date)) {
+                        show_notification("Nilai ujian berhasil disimpan.", true);
+                        load_tab_data(MENU_GRADES);
+                    } else {
+                        show_notification("Gagal menyimpan nilai ujian!", false);
+                    }
+                }
+            }
+        }
+        nk_group_end(ctx);
+    }
+
+    // Right Column: Display Tables Group
+    if (nk_group_begin(ctx, "DisplayGradesGroup", NK_WINDOW_BORDER)) {
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label_colored(ctx, "DAFTAR CAPAIAN NILAI HARIAN", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+
+        nk_layout_row_template_begin(ctx, 20);
+        nk_layout_row_template_push_static(ctx, 70);  // TP code
+        nk_layout_row_template_push_static(ctx, 50);  // score
+        nk_layout_row_template_push_dynamic(ctx);     // notes
+        nk_layout_row_template_push_static(ctx, 50);  // delete action
+        nk_layout_row_template_end(ctx);
+
+        nk_label_colored(ctx, "TP", NK_TEXT_LEFT, nk_rgb(120, 130, 145));
+        nk_label_colored(ctx, "Nilai", NK_TEXT_LEFT, nk_rgb(120, 130, 145));
+        nk_label_colored(ctx, "Catatan Kompetensi", NK_TEXT_LEFT, nk_rgb(120, 130, 145));
+        nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(120, 130, 145));
+        
+        for (int i = 0; i < g_daily_grades_count; i++) {
+            nk_layout_row_template_begin(ctx, 22);
+            nk_layout_row_template_push_static(ctx, 70);
+            nk_layout_row_template_push_static(ctx, 50);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_push_static(ctx, 50);
+            nk_layout_row_template_end(ctx);
+
+            nk_label(ctx, g_daily_grades[i].tp_code, NK_TEXT_LEFT);
+            char sc_buf[20];
+            snprintf(sc_buf, sizeof(sc_buf), "%.1f", g_daily_grades[i].score);
+            nk_label_colored(ctx, sc_buf, NK_TEXT_LEFT, g_daily_grades[i].score >= 70.0 ? nk_rgb(46, 204, 113) : nk_rgb(192, 57, 43));
+            nk_label(ctx, g_daily_grades[i].notes, NK_TEXT_LEFT);
+            if (nk_button_label(ctx, "X")) {
+                if (db_delete_daily_grade(g_daily_grades[i].id)) {
+                    show_notification("Nilai harian berhasil dihapus.", true);
+                    load_tab_data(MENU_GRADES);
+                }
+            }
+        }
+
+        nk_layout_row_dynamic(ctx, 15, 1); // Spacer
+
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label_colored(ctx, "DAFTAR HASIL EVALUASI UJIAN SUMATIF", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+
+        nk_layout_row_template_begin(ctx, 20);
+        nk_layout_row_template_push_dynamic(ctx);     // Subject
+        nk_layout_row_template_push_static(ctx, 60);  // Type (UTS/UAS)
+        nk_layout_row_template_push_static(ctx, 50);  // score
+        nk_layout_row_template_push_static(ctx, 50);  // action
+        nk_layout_row_template_end(ctx);
+
+        nk_label_colored(ctx, "Mata Pelajaran", NK_TEXT_LEFT, nk_rgb(120, 130, 145));
+        nk_label_colored(ctx, "Ujian", NK_TEXT_LEFT, nk_rgb(120, 130, 145));
+        nk_label_colored(ctx, "Nilai", NK_TEXT_LEFT, nk_rgb(120, 130, 145));
+        nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(120, 130, 145));
+
+        for (int i = 0; i < g_exam_grades_count; i++) {
+            nk_layout_row_template_begin(ctx, 22);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_push_static(ctx, 60);
+            nk_layout_row_template_push_static(ctx, 50);
+            nk_layout_row_template_push_static(ctx, 50);
+            nk_layout_row_template_end(ctx);
+
+            nk_label(ctx, g_exam_grades[i].subject, NK_TEXT_LEFT);
+            nk_label(ctx, g_exam_grades[i].exam_type == EXAM_UTS ? "UTS" : "UAS", NK_TEXT_LEFT);
+            char sc_buf[20];
+            snprintf(sc_buf, sizeof(sc_buf), "%.1f", g_exam_grades[i].score);
+            nk_label_colored(ctx, sc_buf, NK_TEXT_LEFT, g_exam_grades[i].score >= 70.0 ? nk_rgb(46, 204, 113) : nk_rgb(192, 57, 43));
+            if (nk_button_label(ctx, "X")) {
+                if (db_delete_exam_grade(g_exam_grades[i].id)) {
+                    show_notification("Nilai ujian berhasil dihapus.", true);
+                    load_tab_data(MENU_GRADES);
+                }
+            }
+        }
+        nk_group_end(ctx);
+    }
+}
+
+// SUB-SCREEN: Users Tab (Admin Only)
+static void draw_users_tab(struct nk_context *ctx) {
+    nk_layout_row_dynamic(ctx, 30, 1);
+    nk_label_colored(ctx, "MANAJEMEN PENGGUNA APLIKASI (USERS)", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+
+    if (g_current_user.role != ROLE_ADMIN) {
+        nk_layout_row_dynamic(ctx, 40, 1);
+        nk_label_colored(ctx, "MAAF, MENU INI HANYA BISA DIAKSES OLEH ADMINISTRATOR UTAMA.", NK_TEXT_CENTERED, nk_rgb(192, 57, 43));
+        return;
+    }
+
+    if (!g_show_form) {
+        nk_layout_row_template_begin(ctx, 35);
+        nk_layout_row_template_push_dynamic(ctx);
+        nk_layout_row_template_push_static(ctx, 180);
+        nk_layout_row_template_end(ctx);
+
+        nk_spacing(ctx, 1);
+        if (nk_button_label(ctx, "+ TAMBAH USER BARU")) {
+            g_show_form = true;
+            g_is_editing = false;
+            g_editing_id = 0;
+            g_form_txt1[0] = '\0'; // username
+            g_form_txt2[0] = '\0'; // password
+            g_form_txt3[0] = '\0'; // name
+            g_form_role_idx = 1;   // GURU by default
+        }
+
+        nk_layout_row_dynamic(ctx, 15, 1);
+
+        nk_layout_row_template_begin(ctx, 25);
+        nk_layout_row_template_push_static(ctx, 120); // Username
+        nk_layout_row_template_push_dynamic(ctx);     // Name
+        nk_layout_row_template_push_static(ctx, 120); // Role
+        nk_layout_row_template_push_static(ctx, 120); // Actions
+        nk_layout_row_template_end(ctx);
+
+        nk_label_colored(ctx, "Username", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Nama Lengkap", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Peran (Role)", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+        nk_label_colored(ctx, "Aksi", NK_TEXT_LEFT, nk_rgb(160, 170, 185));
+
+        nk_layout_row_dynamic(ctx, 1, 1);
+        nk_rule_horizontal(ctx, nk_rgb(45, 54, 72), 1);
+
+        for (int i = 0; i < g_users_count; i++) {
+            nk_layout_row_template_begin(ctx, 30);
+            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_push_static(ctx, 120);
+            nk_layout_row_template_end(ctx);
+
+            nk_label(ctx, g_users[i].username, NK_TEXT_LEFT);
+            nk_label(ctx, g_users[i].name, NK_TEXT_LEFT);
+            
+            const char *role_str = "ADMINISTRATOR";
+            if (g_users[i].role == ROLE_GURU) role_str = "GURU";
+            else if (g_users[i].role == ROLE_STAF) role_str = "STAF TATA USAHA";
+            nk_label(ctx, role_str, NK_TEXT_LEFT);
+
+            nk_layout_row_dynamic(ctx, 22, 2);
+            if (nk_button_label(ctx, "Edit")) {
+                g_show_form = true;
+                g_is_editing = true;
+                g_editing_id = g_users[i].id;
+                strncpy(g_form_txt1, g_users[i].username, sizeof(g_form_txt1) - 1);
+                g_form_txt2[0] = '\0'; // keep empty to not change password
+                strncpy(g_form_txt3, g_users[i].name, sizeof(g_form_txt3) - 1);
+                g_form_role_idx = (int)g_users[i].role;
+            }
+            if (nk_button_label(ctx, "Hapus")) {
+                if (g_users[i].id == g_current_user.id) {
+                    show_notification("Tidak bisa menghapus akun sendiri!", false);
+                } else {
+                    if (db_delete_user(g_users[i].id)) {
+                        show_notification("User berhasil dihapus.", true);
+                        load_tab_data(MENU_USERS);
+                    } else {
+                        show_notification("Gagal menghapus user!", false);
+                    }
+                }
+            }
+        }
+    } else {
+        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_label(ctx, g_is_editing ? "EDIT USER DETAIL" : "DAFTAR USER BARU", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 22, 2);
+        nk_label(ctx, "Username Pengguna (Unik)", NK_TEXT_LEFT);
+        nk_label(ctx, g_is_editing ? "Password Baru (Kosongkan jika tidak diganti)" : "Password", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 30, 2);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt1, sizeof(g_form_txt1), nk_filter_ascii);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt2, sizeof(g_form_txt2), nk_filter_ascii);
+
+        nk_layout_row_dynamic(ctx, 22, 2);
+        nk_label(ctx, "Nama Lengkap", NK_TEXT_LEFT);
+        nk_label(ctx, "Peran / Hak Akses", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 30, 2);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt3, sizeof(g_form_txt3), nk_filter_ascii);
+        
+        const char *role_options[] = {"ADMINISTRATOR (0)", "GURU BINAAN (1)", "STAF TATA USAHA (2)"};
+        g_form_role_idx = nk_combo(ctx, role_options, 3, g_form_role_idx, 25, nk_vec2(200, 100));
+
+        nk_layout_row_dynamic(ctx, 20, 1); // Spacer
+
+        nk_layout_row_dynamic(ctx, 35, 2);
+        if (nk_button_label(ctx, "SIMPAN")) {
+            if (strlen(g_form_txt1) == 0 || strlen(g_form_txt3) == 0 || (!g_is_editing && strlen(g_form_txt2) == 0)) {
+                show_notification("Username, Nama, dan Password (untuk user baru) wajib diisi!", false);
+            } else {
+                User u;
+                u.id = g_editing_id;
+                strncpy(u.username, g_form_txt1, sizeof(u.username) - 1);
+                strncpy(u.password_hash, g_form_txt2, sizeof(u.password_hash) - 1);
+                strncpy(u.name, g_form_txt3, sizeof(u.name) - 1);
+                u.role = (UserRole)g_form_role_idx;
+
+                bool success = g_is_editing ? db_update_user(&u) : db_create_user(&u);
+                if (success) {
+                    show_notification("Akun pengguna berhasil disimpan.", true);
+                    g_show_form = false;
+                    load_tab_data(MENU_USERS);
+                } else {
+                    show_notification("Gagal menyimpan akun (Username unik)!", false);
+                }
+            }
+        }
+        if (nk_button_label(ctx, "BATAL")) g_show_form = false;
+    }
+}
+
+// SUB-SCREEN: Backup & Restore
+static void draw_backup_tab(struct nk_context *ctx) {
+    nk_layout_row_dynamic(ctx, 30, 1);
+    nk_label_colored(ctx, "BACKUP & RESTORE DATABASE SQLITE", NK_TEXT_LEFT, nk_rgb(255, 255, 255));
+
+    nk_layout_row_dynamic(ctx, 20, 1); // Spacer
+
+    nk_layout_row_dynamic(ctx, 160, 2);
+
+    // Backup Group
+    if (nk_group_begin(ctx, "BackupGroup", NK_WINDOW_BORDER)) {
+        nk_layout_row_dynamic(ctx, 25, 1);
+        nk_label_colored(ctx, "BACKUP DATABASES", NK_TEXT_LEFT, nk_rgb(46, 204, 113));
+        nk_label(ctx, "Simpan salinan database ke file cadangan.", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_backup_path, sizeof(g_backup_path), nk_filter_ascii);
+
+        nk_layout_row_dynamic(ctx, 10, 1); // Spacer
+        nk_layout_row_dynamic(ctx, 35, 1);
+        if (nk_button_label(ctx, "PROSES BACKUP")) {
+            if (service_backup_db(g_backup_path)) {
+                char msg[256];
+                snprintf(msg, sizeof(msg), "Backup sukses ke: %s", g_backup_path);
+                show_notification(msg, true);
+            } else {
+                show_notification("Gagal melakukan backup database!", false);
+            }
+        }
+        nk_group_end(ctx);
+    }
+
+    // Restore Group
+    if (nk_group_begin(ctx, "RestoreGroup", NK_WINDOW_BORDER)) {
+        nk_layout_row_dynamic(ctx, 25, 1);
+        nk_label_colored(ctx, "RESTORE DATABASES", NK_TEXT_LEFT, nk_rgb(192, 57, 43));
+        nk_label(ctx, "WARNING: Restore akan menimpa database aktif!", NK_TEXT_LEFT);
+
+        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_restore_path, sizeof(g_restore_path), nk_filter_ascii);
+
+        nk_layout_row_dynamic(ctx, 10, 1); // Spacer
+        nk_layout_row_dynamic(ctx, 35, 1);
+        if (nk_button_label(ctx, "PROSES RESTORE")) {
+            if (service_restore_db(g_restore_path)) {
+                show_notification("Database berhasil di-restore!", true);
+                load_tab_data(MENU_DASHBOARD); // reload
+            } else {
+                show_notification("Gagal me-restore database (Cek file)!", false);
+            }
+        }
+        nk_group_end(ctx);
+    }
+}
+
+// Main Draw Dispatcher
+void ui_render(struct nk_context *ctx, int screen_width, int screen_height) {
+    if (!g_logged_in) {
+        draw_login_screen(ctx, screen_width, screen_height);
+        draw_notification(ctx, screen_width);
+        return;
+    }
+
+    // Full screen Main ERP frame window
+    struct nk_rect full_bounds = nk_rect(0, 0, screen_width, screen_height);
+    if (nk_begin(ctx, "DangerPCA_ERP", full_bounds, NK_WINDOW_NO_SCROLLBAR | NK_WINDOW_BACKGROUND)) {
+        
+        nk_layout_row_template_begin(ctx, screen_height - 10);
+        nk_layout_row_template_push_static(ctx, 180); // Left Sidebar
+        nk_layout_row_template_push_dynamic(ctx);     // Right Main Workspace
+        nk_layout_row_template_end(ctx);
+
+        // Column 1: Sidebar Navigation
+        draw_sidebar(ctx, screen_height);
+
+        // Column 2: Main Workspace Group
+        if (nk_group_begin(ctx, "WorkspaceGroup", NK_WINDOW_NO_SCROLLBAR)) {
+            nk_layout_row_dynamic(ctx, 40, 1);
+            draw_topbar(ctx);
+
+            nk_layout_row_dynamic(ctx, 10, 1); // Spacer
+            nk_layout_row_dynamic(ctx, screen_height - 85, 1);
+            if (nk_group_begin(ctx, "ContentPane", NK_WINDOW_BORDER)) {
+                switch (g_current_menu) {
+                    case MENU_DASHBOARD: draw_dashboard(ctx); break;
+                    case MENU_STUDENTS: draw_students_tab(ctx); break;
+                    case MENU_TEACHERS: draw_teachers_tab(ctx); break;
+                    case MENU_CLASSES: draw_classes_tab(ctx); break;
+                    case MENU_ATTENDANCE: draw_attendance_tab(ctx); break;
+                    case MENU_ACADEMIC: draw_academic_tab(ctx); break;
+                    case MENU_JOURNAL: draw_journal_tab(ctx); break;
+                    case MENU_GRADES: draw_grades_tab(ctx); break;
+                    case MENU_USERS: draw_users_tab(ctx); break;
+                    case MENU_BACKUP: draw_backup_tab(ctx); break;
+                }
+                nk_group_end(ctx);
+            }
+            nk_group_end(ctx);
+        }
+    }
+    nk_end(ctx);
+
+    // Draw overlay notification toast
+    draw_notification(ctx, screen_width);
+}

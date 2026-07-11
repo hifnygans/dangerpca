@@ -1,0 +1,2 @@
+/usr/bin/dangerpca
+/usr/share/dangerpca/assets/Roboto-Regular.ttf

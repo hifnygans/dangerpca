@@ -1,0 +1,81 @@
+name: Build and Package ERP
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-linux:
+    name: Build Linux (.deb package)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libsdl2-dev libsqlite3-dev
+
+      - name: Configure CMake
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Code
+        run: |
+          cd build
+          make -j$(nproc)
+
+      - name: Generate Debian Package
+        run: |
+          cd build
+          cpack -G DEB
+
+      - name: Upload Debian Package Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: dangerpca-linux-deb
+          path: build/*.deb
+
+      - name: Upload Linux Executable
+        uses: actions/upload-artifact@v3
+        with:
+          name: dangerpca-linux-binary
+          path: build/dangerpca
+
+  build-windows:
+    name: Build Windows (.exe binary)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up MSVC & Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install vcpkg Dependencies
+        run: |
+          vcpkg install sdl2:x64-windows-static sqlite3:x64-windows-static
+
+      - name: Configure CMake (Static Linking)
+        run: |
+          mkdir build
+          cd build
+          cmake .. -A x64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
+
+      - name: Build Executable
+        run: |
+          cd build
+          cmake --build . --config Release
+
+      - name: Upload Windows Executable
+        uses: actions/upload-artifact@v3
+        with:
+          name: dangerpca-windows-x64
+          path: build/Release/dangerpca.exe

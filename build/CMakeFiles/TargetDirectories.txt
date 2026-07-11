@@ -1,0 +1,10 @@
+/home/hifni/dangerpca/build/CMakeFiles/dangerpca.dir
+/home/hifni/dangerpca/build/CMakeFiles/copy_assets.dir
+/home/hifni/dangerpca/build/CMakeFiles/package.dir
+/home/hifni/dangerpca/build/CMakeFiles/package_source.dir
+/home/hifni/dangerpca/build/CMakeFiles/edit_cache.dir
+/home/hifni/dangerpca/build/CMakeFiles/rebuild_cache.dir
+/home/hifni/dangerpca/build/CMakeFiles/list_install_components.dir
+/home/hifni/dangerpca/build/CMakeFiles/install.dir
+/home/hifni/dangerpca/build/CMakeFiles/install/local.dir
+/home/hifni/dangerpca/build/CMakeFiles/install/strip.dir
