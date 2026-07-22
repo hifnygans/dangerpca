@@ -76,23 +76,43 @@ static int g_selected_student_idx = 0;
 static int g_selected_tp_idx = 0;
 static char g_subject_filter[100] = "Matematika";
 
+// Theme colors (Global for UI & Rich Text Editor)
+static bool g_light_mode = false;
+static struct nk_color g_theme_text_header;
+static struct nk_color g_theme_text_muted;
+static struct nk_color g_theme_border;
+static struct nk_color g_theme_primary;
+static struct nk_color g_theme_accent;
+
 // Form States (Editing / Adding)
 static bool g_show_form = false;
 static bool g_is_editing = false;
 static int g_editing_id = 0;
 
-// Temporary Form Buffers
-static char g_form_txt1[200] = "";
-static char g_form_txt2[200] = "";
-static char g_form_txt3[200] = "";
-static char g_form_txt4[200] = "";
-static char g_form_txt5[200] = "";
-static char g_form_txt6[200] = "";
+// Temporary Form Buffers (Increased for Rich Text Editor)
+static char g_form_txt1[1024] = "";
+static char g_form_txt2[1024] = "";
+static char g_form_txt3[1024] = "";
+static char g_form_txt4[1024] = "";
+static char g_form_txt5[1024] = "";
+static char g_form_txt6[1024] = "";
 static int g_form_int1 = 0;
 static double g_form_dbl1 = 0.0;
 static int g_form_gender_idx = 0; // 0=L, 1=P
 static int g_form_status_idx = 0;
 static int g_form_role_idx = 0;
+
+// Rich Text Editor State Trackers
+static int g_rte_mode_journal_act = 0;  // 0=Edit, 1=Preview, 2=Split
+static int g_rte_mode_journal_note = 0;
+static int g_rte_mode_cp = 0;
+static int g_rte_mode_tp = 0;
+static int g_rte_mode_atp = 0;
+static int g_rte_mode_student = 0;
+
+// Journal Detail Viewer State
+static bool g_show_journal_detail = false;
+static DailyJournal g_detail_journal;
 
 // Backup / Restore Buffers
 static char g_backup_path[256] = "dangerpca_backup.db";
@@ -113,6 +133,219 @@ static void get_today_date(char *buf, int max_len) {
     time_t t = time(NULL);
     struct tm *tm_info = localtime(&t);
     strftime(buf, max_len, "%Y-%m-%d", tm_info);
+}
+
+// RICH TEXT EDITOR HELPERS & RENDERER
+static void rte_insert_markup(char *buffer, size_t max_size, const char *prefix, const char *suffix) {
+    if (!buffer || max_size == 0) return;
+
+    if (strcmp(prefix, "TEMPLATE") == 0) {
+        const char *tmpl = 
+            "# JURNAL PEMBELAJARAN HARIAN\n"
+            "## 1. Materi Utama & Capaian:\n"
+            "- Pengenalan konsep & teori dasar\n"
+            "- Latihan soal & simulasi mandiri\n"
+            "\n"
+            "## 2. Catatan Evaluasi Siswa:\n"
+            "[x] Seluruh siswa mengikuti sesi dengan baik\n"
+            "[ ] Perlu pendalaman untuk 3 siswa\n"
+            "\n"
+            "> Catatan Tambahan: Tugas dikumpulkan minggu depan.";
+        snprintf(buffer, max_size, "%s", tmpl);
+        return;
+    }
+
+    size_t len = strlen(buffer);
+    size_t pref_len = strlen(prefix);
+    size_t suff_len = strlen(suffix);
+
+    const char *sample = "teks";
+    if (strcmp(prefix, "\n# ") == 0) sample = "Judul Utama";
+    else if (strcmp(prefix, "\n## ") == 0) sample = "Sub Judul";
+    else if (strcmp(prefix, "\n- ") == 0) sample = "Poin Catatan";
+    else if (strcmp(prefix, "\n[x] ") == 0) sample = "Tugas Selesai";
+    else if (strcmp(prefix, "\n> ") == 0) sample = "Catatan Khusus";
+
+    size_t sample_len = strlen(sample);
+
+    if (len + pref_len + sample_len + suff_len + 1 < max_size) {
+        strcat(buffer, prefix);
+        strcat(buffer, sample);
+        strcat(buffer, suffix);
+    }
+}
+
+static void render_rich_text_content(struct nk_context *ctx, const char *text, const char *group_id_prefix) {
+    if (!text || strlen(text) == 0) return;
+
+    char line_buf[512];
+    const char *p = text;
+    int line_idx = 0;
+
+    while (*p) {
+        const char *line_start = p;
+        while (*p && *p != '\n') p++;
+        
+        size_t line_len = p - line_start;
+        if (line_len >= sizeof(line_buf)) line_len = sizeof(line_buf) - 1;
+        memcpy(line_buf, line_start, line_len);
+        line_buf[line_len] = '\0';
+        
+        if (*p == '\n') p++;
+
+        if (line_len > 0 && line_buf[line_len - 1] == '\r') {
+            line_buf[line_len - 1] = '\0';
+            line_len--;
+        }
+
+        line_idx++;
+
+        if (line_len == 0) {
+            nk_layout_row_dynamic(ctx, 6, 1);
+            nk_spacing(ctx, 1);
+            continue;
+        }
+
+        // Header 1: "# "
+        if (strncmp(line_buf, "# ", 2) == 0) {
+            nk_layout_row_dynamic(ctx, 24, 1);
+            nk_label_colored(ctx, line_buf + 2, NK_TEXT_LEFT, g_theme_text_header);
+        }
+        // Header 2: "## "
+        else if (strncmp(line_buf, "## ", 3) == 0) {
+            nk_layout_row_dynamic(ctx, 22, 1);
+            nk_label_colored(ctx, line_buf + 3, NK_TEXT_LEFT, g_theme_primary);
+        }
+        // Header 3: "### "
+        else if (strncmp(line_buf, "### ", 4) == 0) {
+            nk_layout_row_dynamic(ctx, 20, 1);
+            nk_label_colored(ctx, line_buf + 4, NK_TEXT_LEFT, g_theme_accent);
+        }
+        // Bullet item: "- " or "* "
+        else if (strncmp(line_buf, "- ", 2) == 0 || strncmp(line_buf, "* ", 2) == 0) {
+            nk_layout_row_template_begin(ctx, 20);
+            nk_layout_row_template_push_static(ctx, 18);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_end(ctx);
+            nk_label_colored(ctx, "•", NK_TEXT_LEFT, g_theme_primary);
+            nk_label(ctx, line_buf + 2, NK_TEXT_LEFT);
+        }
+        // Checkboxes: "[x] " or "[X] "
+        else if (strncmp(line_buf, "[x] ", 4) == 0 || strncmp(line_buf, "[X] ", 4) == 0) {
+            nk_layout_row_template_begin(ctx, 20);
+            nk_layout_row_template_push_static(ctx, 28);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_end(ctx);
+            nk_label_colored(ctx, "[✓]", NK_TEXT_LEFT, nk_rgb(34, 197, 94));
+            nk_label(ctx, line_buf + 4, NK_TEXT_LEFT);
+        }
+        // Unchecked: "[ ] "
+        else if (strncmp(line_buf, "[ ] ", 4) == 0) {
+            nk_layout_row_template_begin(ctx, 20);
+            nk_layout_row_template_push_static(ctx, 28);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_end(ctx);
+            nk_label_colored(ctx, "[  ]", NK_TEXT_LEFT, g_theme_text_muted);
+            nk_label(ctx, line_buf + 4, NK_TEXT_LEFT);
+        }
+        // Quote / Callout: "> "
+        else if (strncmp(line_buf, "> ", 2) == 0) {
+            nk_layout_row_dynamic(ctx, 24, 1);
+            char q_grp[64];
+            snprintf(q_grp, sizeof(q_grp), "rte_q_%s_%d", group_id_prefix, line_idx);
+            if (nk_group_begin(ctx, q_grp, NK_WINDOW_NO_SCROLLBAR)) {
+                nk_layout_row_dynamic(ctx, 18, 1);
+                nk_label_colored(ctx, line_buf + 2, NK_TEXT_LEFT, g_theme_accent);
+                nk_group_end(ctx);
+            }
+        }
+        // Code line
+        else if (line_buf[0] == '`' || strchr(line_buf, '`') != NULL) {
+            nk_layout_row_dynamic(ctx, 20, 1);
+            nk_label_colored(ctx, line_buf, NK_TEXT_LEFT, nk_rgb(234, 179, 8));
+        }
+        // Bold / Header highlight line
+        else if (strstr(line_buf, "**") != NULL) {
+            nk_layout_row_dynamic(ctx, 20, 1);
+            nk_label_colored(ctx, line_buf, NK_TEXT_LEFT, g_theme_text_header);
+        }
+        // Plain line
+        else {
+            nk_layout_row_dynamic(ctx, 20, 1);
+            nk_label(ctx, line_buf, NK_TEXT_LEFT);
+        }
+    }
+}
+
+static void draw_rich_text_editor(struct nk_context *ctx, const char *label, char *buffer, size_t max_size, float edit_height, int *mode, const char *group_id) {
+    // 1. Header label and Mode Switcher
+    nk_layout_row_template_begin(ctx, 25);
+    nk_layout_row_template_push_dynamic(ctx);
+    nk_layout_row_template_push_static(ctx, 210);
+    nk_layout_row_template_end(ctx);
+
+    char header_label[128];
+    snprintf(header_label, sizeof(header_label), "%s  [Rich Text]", label);
+    nk_label_colored(ctx, header_label, NK_TEXT_LEFT, g_theme_text_header);
+
+    char mode_grp[64];
+    snprintf(mode_grp, sizeof(mode_grp), "rte_hdr_%s", group_id);
+    if (nk_group_begin(ctx, mode_grp, NK_WINDOW_NO_SCROLLBAR)) {
+        nk_layout_row_dynamic(ctx, 22, 3);
+        if (nk_button_label(ctx, *mode == 0 ? "[Edit]" : "Edit")) *mode = 0;
+        if (nk_button_label(ctx, *mode == 1 ? "[Preview]" : "Preview")) *mode = 1;
+        if (nk_button_label(ctx, *mode == 2 ? "[Split]" : "Split")) *mode = 2;
+        nk_group_end(ctx);
+    }
+
+    // 2. Formatting Toolbar (when in Edit or Split mode)
+    if (*mode == 0 || *mode == 2) {
+        nk_layout_row_dynamic(ctx, 25, 10);
+        if (nk_button_label(ctx, "B")) rte_insert_markup(buffer, max_size, "**", "**");
+        if (nk_button_label(ctx, "I")) rte_insert_markup(buffer, max_size, "*", "*");
+        if (nk_button_label(ctx, "U")) rte_insert_markup(buffer, max_size, "<u>", "</u>");
+        if (nk_button_label(ctx, "H1")) rte_insert_markup(buffer, max_size, "\n# ", "");
+        if (nk_button_label(ctx, "H2")) rte_insert_markup(buffer, max_size, "\n## ", "");
+        if (nk_button_label(ctx, "- List")) rte_insert_markup(buffer, max_size, "\n- ", "");
+        if (nk_button_label(ctx, "[x] Check")) rte_insert_markup(buffer, max_size, "\n[x] ", "");
+        if (nk_button_label(ctx, "> Quote")) rte_insert_markup(buffer, max_size, "\n> ", "");
+        if (nk_button_label(ctx, "`Code`")) rte_insert_markup(buffer, max_size, "`", "`");
+        if (nk_button_label(ctx, "+ Tmpl")) rte_insert_markup(buffer, max_size, "TEMPLATE", "");
+    }
+
+    // 3. Editor / Preview view
+    if (*mode == 0) {
+        nk_layout_row_dynamic(ctx, edit_height, 1);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX, buffer, max_size, nk_filter_default);
+    } else if (*mode == 1) {
+        char preview_grp[64];
+        snprintf(preview_grp, sizeof(preview_grp), "rte_prev_%s", group_id);
+        nk_layout_row_dynamic(ctx, edit_height + 25, 1);
+        if (nk_group_begin(ctx, preview_grp, 0)) {
+            if (strlen(buffer) == 0) {
+                nk_layout_row_dynamic(ctx, 20, 1);
+                nk_label_colored(ctx, "(Teks masih kosong. Tuliskan teks di tab Edit...)", NK_TEXT_LEFT, g_theme_text_muted);
+            } else {
+                render_rich_text_content(ctx, buffer, group_id);
+            }
+            nk_group_end(ctx);
+        }
+    } else {
+        nk_layout_row_dynamic(ctx, edit_height, 2);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX, buffer, max_size, nk_filter_default);
+
+        char preview_grp[64];
+        snprintf(preview_grp, sizeof(preview_grp), "rte_split_%s", group_id);
+        if (nk_group_begin(ctx, preview_grp, 0)) {
+            if (strlen(buffer) == 0) {
+                nk_layout_row_dynamic(ctx, 20, 1);
+                nk_label_colored(ctx, "(Live preview...)", NK_TEXT_LEFT, g_theme_text_muted);
+            } else {
+                render_rich_text_content(ctx, buffer, group_id);
+            }
+            nk_group_end(ctx);
+        }
+    }
 }
 
 // Data loading manager
@@ -166,12 +399,6 @@ static void load_tab_data(SidebarMenu menu) {
             break;
     }
 }
-
-// Theme variables
-static bool g_light_mode = false;
-static struct nk_color g_theme_text_header;
-static struct nk_color g_theme_text_muted;
-static struct nk_color g_theme_border;
 
 static void set_material_dark_theme(struct nk_context *ctx) {
     struct nk_color table[NK_COLOR_COUNT];
@@ -261,11 +488,15 @@ static void ui_apply_theme(struct nk_context *ctx) {
         g_theme_text_header = nk_rgb(33, 33, 33);
         g_theme_text_muted = nk_rgb(117, 117, 117);
         g_theme_border = nk_rgb(224, 224, 224);
+        g_theme_primary = nk_rgb(63, 81, 181);
+        g_theme_accent = nk_rgb(233, 30, 99);
     } else {
         set_material_dark_theme(ctx);
         g_theme_text_header = nk_rgb(255, 255, 255);
         g_theme_text_muted = nk_rgb(160, 170, 185);
         g_theme_border = nk_rgb(45, 54, 72);
+        g_theme_primary = nk_rgb(33, 150, 243);
+        g_theme_accent = nk_rgb(255, 64, 129);
     }
 }
 
@@ -748,13 +979,9 @@ static void draw_students_tab(struct nk_context *ctx, int screen_width) {
         const char *status_options[] = {"Aktif", "Lulus", "Keluar"};
         g_form_status_idx = nk_combo(ctx, status_options, 3, g_form_status_idx, 25, nk_vec2(200, 100));
 
-        nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label(ctx, "Alamat Rumah", NK_TEXT_LEFT);
+        draw_rich_text_editor(ctx, "Alamat Rumah & Catatan Khusus Siswa", g_form_txt4, sizeof(g_form_txt4), 80.0f, &g_rte_mode_student, "std_addr");
 
-        nk_layout_row_dynamic(ctx, 50, 1);
-        nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX, g_form_txt4, sizeof(g_form_txt4), nk_filter_ascii);
-
-        nk_layout_row_dynamic(ctx, 20, 1); // Spacer
+        nk_layout_row_dynamic(ctx, 15, 1); // Spacer
 
         nk_layout_row_dynamic(ctx, 35, 2);
         if (nk_button_label(ctx, "SIMPAN")) {
@@ -1429,16 +1656,9 @@ static void draw_academic_tab(struct nk_context *ctx, int screen_width) {
             nk_label(ctx, "Mata Pelajaran", NK_TEXT_LEFT);
 
             nk_layout_row_dynamic(ctx, 30, 2);
-            nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt1, sizeof(g_form_txt1), nk_filter_ascii);
             nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt2, sizeof(g_form_txt2), nk_filter_ascii);
-
-            nk_layout_row_dynamic(ctx, 22, 1);
-            nk_label(ctx, "Deskripsi CP", NK_TEXT_LEFT);
-
-            nk_layout_row_dynamic(ctx, 60, 1);
-            nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX, g_form_txt3, sizeof(g_form_txt3), nk_filter_ascii);
-
-            nk_layout_row_dynamic(ctx, 20, 1); // Spacer
+            draw_rich_text_editor(ctx, "Deskripsi Capaian Pembelajaran (CP)", g_form_txt3, sizeof(g_form_txt3), 90.0f, &g_rte_mode_cp, "cp_desc");
+            nk_layout_row_dynamic(ctx, 15, 1);
 
             nk_layout_row_dynamic(ctx, 35, 2);
             if (nk_button_label(ctx, "SIMPAN")) {
@@ -1565,13 +1785,8 @@ static void draw_academic_tab(struct nk_context *ctx, int screen_width) {
             }
             nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt1, sizeof(g_form_txt1), nk_filter_ascii);
 
-            nk_layout_row_dynamic(ctx, 22, 1);
-            nk_label(ctx, "Deskripsi Kompetensi TP", NK_TEXT_LEFT);
-
-            nk_layout_row_dynamic(ctx, 60, 1);
-            nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX, g_form_txt2, sizeof(g_form_txt2), nk_filter_ascii);
-
-            nk_layout_row_dynamic(ctx, 20, 1);
+            draw_rich_text_editor(ctx, "Deskripsi Kompetensi TP", g_form_txt2, sizeof(g_form_txt2), 90.0f, &g_rte_mode_tp, "tp_desc");
+            nk_layout_row_dynamic(ctx, 15, 1);
 
             nk_layout_row_dynamic(ctx, 35, 2);
             if (nk_button_label(ctx, "SIMPAN")) {
@@ -1693,7 +1908,7 @@ static void draw_academic_tab(struct nk_context *ctx, int screen_width) {
             for (int tp = 0; tp < g_tp_count; tp++) {
                 tp_options[tp] = g_tp[tp].code;
             }
-            if (g_tp_count > 0) {
+            if (g_cp_count > 0) {
                 g_form_int1 = nk_combo(ctx, tp_options, g_tp_count, g_form_int1, 25, nk_vec2(250, 180));
             } else {
                 nk_label(ctx, "Buat TP dahulu!", NK_TEXT_LEFT);
@@ -1701,13 +1916,8 @@ static void draw_academic_tab(struct nk_context *ctx, int screen_width) {
             // Simple integer entry for order
             nk_property_int(ctx, "Urutan #", 1, &g_form_status_idx, 100, 1, 1);
 
-            nk_layout_row_dynamic(ctx, 22, 1);
-            nk_label(ctx, "Deskripsi Langkah Alur / Skenario ATP", NK_TEXT_LEFT);
-
-            nk_layout_row_dynamic(ctx, 60, 1);
-            nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX, g_form_txt1, sizeof(g_form_txt1), nk_filter_ascii);
-
-            nk_layout_row_dynamic(ctx, 20, 1);
+            draw_rich_text_editor(ctx, "Deskripsi Langkah Alur / Skenario ATP", g_form_txt1, sizeof(g_form_txt1), 90.0f, &g_rte_mode_atp, "atp_desc");
+            nk_layout_row_dynamic(ctx, 15, 1);
 
             nk_layout_row_dynamic(ctx, 35, 2);
             if (nk_button_label(ctx, "SIMPAN")) {
@@ -1739,6 +1949,43 @@ static void draw_academic_tab(struct nk_context *ctx, int screen_width) {
 static void draw_journal_tab(struct nk_context *ctx, int screen_width) {
     nk_layout_row_dynamic(ctx, 30, 1);
     nk_label_colored(ctx, "JURNAL HARIAN GURU & AKTIVITAS ROMBEL", NK_TEXT_LEFT, g_theme_text_header);
+
+    if (g_show_journal_detail) {
+        nk_layout_row_dynamic(ctx, 28, 1);
+        nk_label_colored(ctx, "DETAIL JURNAL HARIAN (PRATINJAU RICH TEXT)", NK_TEXT_LEFT, g_theme_text_header);
+
+        nk_layout_row_dynamic(ctx, 22, 3);
+        nk_label_colored(ctx, g_detail_journal.teacher_name, NK_TEXT_LEFT, g_theme_primary);
+        nk_label_colored(ctx, g_detail_journal.class_name, NK_TEXT_LEFT, g_theme_accent);
+        nk_label_colored(ctx, g_detail_journal.date, NK_TEXT_LEFT, g_theme_text_muted);
+
+        nk_layout_row_dynamic(ctx, 1, 1);
+        nk_rule_horizontal(ctx, g_theme_border, 1);
+
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label_colored(ctx, "AKTIVITAS & MATERI POKOK PEMBELAJARAN:", NK_TEXT_LEFT, g_theme_text_header);
+
+        nk_layout_row_dynamic(ctx, 140, 1);
+        if (nk_group_begin(ctx, "jrn_det_act_grp", 0)) {
+            render_rich_text_content(ctx, g_detail_journal.activity, "jrn_det_act");
+            nk_group_end(ctx);
+        }
+
+        if (strlen(g_detail_journal.notes) > 0) {
+            nk_layout_row_dynamic(ctx, 22, 1);
+            nk_label_colored(ctx, "CATATAN KEJADIAN KHUSUS:", NK_TEXT_LEFT, g_theme_text_header);
+            nk_layout_row_dynamic(ctx, 90, 1);
+            if (nk_group_begin(ctx, "jrn_det_note_grp", 0)) {
+                render_rich_text_content(ctx, g_detail_journal.notes, "jrn_det_note");
+                nk_group_end(ctx);
+            }
+        }
+
+        nk_layout_row_dynamic(ctx, 15, 1);
+        nk_layout_row_dynamic(ctx, 35, 1);
+        if (nk_button_label(ctx, "KEMBALI KE DAFTAR JURNAL")) g_show_journal_detail = false;
+        return;
+    }
 
     if (!g_show_form) {
         if (screen_width < 450) {
@@ -1786,7 +2033,7 @@ static void draw_journal_tab(struct nk_context *ctx, int screen_width) {
         nk_layout_row_template_push_static(ctx, 120); // Teacher
         nk_layout_row_template_push_static(ctx, 80);  // Class
         nk_layout_row_template_push_dynamic(ctx);     // Activity
-        nk_layout_row_template_push_static(ctx, 120); // Action Buttons
+        nk_layout_row_template_push_static(ctx, 210); // Action Buttons (increased for Baca, Edit, Hapus)
         nk_layout_row_template_end(ctx);
 
         nk_label_colored(ctx, "Tanggal", NK_TEXT_LEFT, g_theme_text_muted);
@@ -1804,7 +2051,7 @@ static void draw_journal_tab(struct nk_context *ctx, int screen_width) {
             nk_layout_row_template_push_static(ctx, 120);
             nk_layout_row_template_push_static(ctx, 80);
             nk_layout_row_template_push_dynamic(ctx);
-            nk_layout_row_template_push_static(ctx, 160); // increased for icons
+            nk_layout_row_template_push_static(ctx, 210); // increased for icons & Baca
             nk_layout_row_template_end(ctx);
 
             nk_label(ctx, g_journals[i].date, NK_TEXT_LEFT);
@@ -1816,7 +2063,11 @@ static void draw_journal_tab(struct nk_context *ctx, int screen_width) {
             char act_grp[64];
             snprintf(act_grp, sizeof(act_grp), "jrn_act_%d", g_journals[i].id);
             if (nk_group_begin(ctx, act_grp, NK_WINDOW_NO_SCROLLBAR)) {
-                nk_layout_row_dynamic(ctx, 25, 2);
+                nk_layout_row_dynamic(ctx, 25, 3);
+                if (nk_button_label(ctx, "Baca")) {
+                    g_detail_journal = g_journals[i];
+                    g_show_journal_detail = true;
+                }
                 if (nk_button_label(ctx, ICON_EDIT " Edit")) {
                     g_show_form = true;
                     g_is_editing = true;
@@ -1878,19 +2129,15 @@ static void draw_journal_tab(struct nk_context *ctx, int screen_width) {
         }
         nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt3, sizeof(g_form_txt3), nk_filter_ascii);
 
-        nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label(ctx, "Aktivitas & Materi Pokok Pembelajaran", NK_TEXT_LEFT);
+        nk_layout_row_dynamic(ctx, 10, 1);
 
-        nk_layout_row_dynamic(ctx, 50, 1);
-        nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX, g_form_txt1, sizeof(g_form_txt1), nk_filter_ascii);
+        draw_rich_text_editor(ctx, "Aktivitas & Materi Pokok Pembelajaran", g_form_txt1, sizeof(g_form_txt1), 110.0f, &g_rte_mode_journal_act, "jrn_act");
 
-        nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label(ctx, "Catatan Kejadian Khusus (Optional)", NK_TEXT_LEFT);
+        nk_layout_row_dynamic(ctx, 10, 1);
 
-        nk_layout_row_dynamic(ctx, 40, 1);
-        nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX, g_form_txt2, sizeof(g_form_txt2), nk_filter_ascii);
+        draw_rich_text_editor(ctx, "Catatan Kejadian Khusus (Optional)", g_form_txt2, sizeof(g_form_txt2), 80.0f, &g_rte_mode_journal_note, "jrn_note");
 
-        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_layout_row_dynamic(ctx, 15, 1);
 
         nk_layout_row_dynamic(ctx, 35, 2);
         if (nk_button_label(ctx, "SIMPAN")) {

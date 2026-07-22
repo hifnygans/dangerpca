@@ -76,7 +76,7 @@ typedef struct {
 typedef struct {
     int id;
     char code[20]; // e.g. CP-001
-    char description[500];
+    char description[1024];
     char subject[100];
 } CapaianPembelajaran;
 
@@ -85,7 +85,7 @@ typedef struct {
     int cp_id;
     char cp_code[20]; // helper
     char code[20]; // e.g. TP-001
-    char description[500];
+    char description[1024];
 } TujuanPembelajaran;
 
 typedef struct {
@@ -93,7 +93,7 @@ typedef struct {
     int tp_id;
     char tp_code[20]; // helper
     int order_num;
-    char description[500];
+    char description[1024];
 } AlurTujuanPembelajaran;
 
 typedef struct {
@@ -103,8 +103,8 @@ typedef struct {
     int class_id;
     char class_name[50]; // helper
     char date[20]; // YYYY-MM-DD
-    char activity[500];
-    char notes[200];
+    char activity[1024];
+    char notes[1024];
 } DailyJournal;
 
 typedef struct {
