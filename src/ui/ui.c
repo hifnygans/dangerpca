@@ -31,6 +31,23 @@
 #define ICON_SEARCH      "\xef\x80\x82"
 #define ICON_USER_LOGIN  "\xef\x80\x87"
 #define ICON_LOCK_LOGIN  "\xef\x80\xa3"
+#define ICON_RTE_BOLD        "\xef\x80\xb2"
+#define ICON_RTE_ITALIC      "\xef\x80\xb3"
+#define ICON_RTE_UNDERLINE   "\xef\x83\x8d"
+#define ICON_RTE_STRIKE      "\xef\x83\x8c"
+#define ICON_RTE_HEADING     "\xef\x81\xa7"
+#define ICON_RTE_LIST_UL     "\xef\x80\xba"
+#define ICON_RTE_LIST_OL     "\xef\x80\xbb"
+#define ICON_RTE_CHECK       "\xef\x85\x8a"
+#define ICON_RTE_QUOTE       "\xef\x84\x8d"
+#define ICON_RTE_CODE        "\xef\x84\xa1"
+#define ICON_RTE_ALIGN_LEFT  "\xef\x80\xb6"
+#define ICON_RTE_ALIGN_CENTER "\xef\x80\xb7"
+#define ICON_RTE_ALIGN_RIGHT "\xef\x80\xb5"
+#define ICON_RTE_ERASER      "\xef\x84\xad"
+#define ICON_RTE_TEMPLATE    "\xef\x85\x9c"
+#define ICON_RTE_PALETTE     "\xef\x94\xbf"
+#define ICON_RTE_EYE         "\xef\x81\xae"
 
 
 // Global State
@@ -135,43 +152,173 @@ static void get_today_date(char *buf, int max_len) {
     strftime(buf, max_len, "%Y-%m-%d", tm_info);
 }
 
-// RICH TEXT EDITOR HELPERS & RENDERER
-static void rte_insert_markup(char *buffer, size_t max_size, const char *prefix, const char *suffix) {
+// PROFESSIONAL RICH TEXT EDITOR ENGINE & PARSER
+typedef enum {
+    RTE_CMD_BOLD,
+    RTE_CMD_ITALIC,
+    RTE_CMD_UNDERLINE,
+    RTE_CMD_STRIKE,
+    RTE_CMD_H1,
+    RTE_CMD_H2,
+    RTE_CMD_H3,
+    RTE_CMD_LIST_UL,
+    RTE_CMD_LIST_OL,
+    RTE_CMD_CHECKLIST,
+    RTE_CMD_QUOTE,
+    RTE_CMD_CODE,
+    RTE_CMD_HR,
+    RTE_CMD_COLOR_RED,
+    RTE_CMD_COLOR_BLUE,
+    RTE_CMD_COLOR_GREEN,
+    RTE_CMD_COLOR_PURPLE,
+    RTE_CMD_ALIGN_LEFT,
+    RTE_CMD_ALIGN_CENTER,
+    RTE_CMD_ALIGN_RIGHT,
+    RTE_CMD_CLEAR,
+    RTE_CMD_TMPL_JOURNAL,
+    RTE_CMD_TMPL_CP
+} RteCommand;
+
+static void rte_apply_command(char *buffer, size_t max_size, RteCommand cmd) {
     if (!buffer || max_size == 0) return;
 
-    if (strcmp(prefix, "TEMPLATE") == 0) {
+    if (cmd == RTE_CMD_TMPL_JOURNAL) {
         const char *tmpl = 
-            "# JURNAL PEMBELAJARAN HARIAN\n"
-            "## 1. Materi Utama & Capaian:\n"
-            "- Pengenalan konsep & teori dasar\n"
-            "- Latihan soal & simulasi mandiri\n"
+            "# JURNAL PEMBELAJARAN & AKTIVITAS KELAS\n"
+            "## 1. Topik & Materi Pokok Utama:\n"
+            "- <color:#3b82f6><b>Materi: Persamaan Kuadrat & Diskriminan D = b^2 - 4ac</b></color>\n"
+            "- Pemecahan studi kasus & latihan soal mandiri\n"
             "\n"
-            "## 2. Catatan Evaluasi Siswa:\n"
-            "[x] Seluruh siswa mengikuti sesi dengan baik\n"
-            "[ ] Perlu pendalaman untuk 3 siswa\n"
+            "## 2. Catatan Evaluasi & Kehadiran:\n"
+            "[x] Seluruh siswa mengikuti pembelajaran dengan baik\n"
+            "[x] Modul latihan halaman 45 diselesaikan\n"
+            "[ ] Sesi remidial kelompok 3 dilakukan minggu depan\n"
             "\n"
-            "> Catatan Tambahan: Tugas dikumpulkan minggu depan.";
+            "> <b>Catatan Khusus Guru:</b> Siswa menunjukkan pemahaman yang sangat tinggi pada rumus diskriminan.\n"
+            "\n"
+            "---\n"
+            "```\n"
+            "// Formula Diskriminan\n"
+            "double D = (b * b) - (4 * a * c);\n"
+            "```";
         snprintf(buffer, max_size, "%s", tmpl);
+        return;
+    } else if (cmd == RTE_CMD_TMPL_CP) {
+        const char *tmpl = 
+            "# CAPAIAN PEMBELAJARAN (CP)\n"
+            "## 1. Elemen Kompetensi Utama:\n"
+            "- <color:#22c55e><b>Peserta didik mampu menganalisis & menyelesaikan permasalahan matematis</b></color>\n"
+            "- Mengaplikasikan prinsip logika & pemodelan data\n"
+            "\n"
+            "## 2. Target Hasil Belajar:\n"
+            "[x] Memahami konsep dasar kurikulum merdeka\n"
+            "[x] Menyelesaikan minimal 5 indikator ketercapaian\n"
+            "\n"
+            "> <b>Kriteria Ketuntasan:</b> Nilai rata-rata kognitif minimal 75.";
+        snprintf(buffer, max_size, "%s", tmpl);
+        return;
+    } else if (cmd == RTE_CMD_CLEAR) {
+        buffer[0] = '\0';
         return;
     }
 
+    const char *prefix = "";
+    const char *sample = "Teks";
+    const char *suffix = "";
+
+    switch (cmd) {
+        case RTE_CMD_BOLD: prefix = "<b>"; sample = "Teks Tebal"; suffix = "</b>"; break;
+        case RTE_CMD_ITALIC: prefix = "<i>"; sample = "Teks Miring"; suffix = "</i>"; break;
+        case RTE_CMD_UNDERLINE: prefix = "<u>"; sample = "Teks Garis Bawah"; suffix = "</u>"; break;
+        case RTE_CMD_STRIKE: prefix = "<s>"; sample = "Teks Coret"; suffix = "</s>"; break;
+        case RTE_CMD_H1: prefix = "\n# "; sample = "Judul Topik Utama"; suffix = "\n"; break;
+        case RTE_CMD_H2: prefix = "\n## "; sample = "Sub-Judul Pembahasan"; suffix = "\n"; break;
+        case RTE_CMD_H3: prefix = "\n### "; sample = "Sub Poin Materi"; suffix = "\n"; break;
+        case RTE_CMD_LIST_UL: prefix = "\n- "; sample = "Poin Catatan Utama\n- Poin Catatan Tambahan"; suffix = "\n"; break;
+        case RTE_CMD_LIST_OL: prefix = "\n1. "; sample = "Langkah Pertama\n2. Langkah Kedua"; suffix = "\n"; break;
+        case RTE_CMD_CHECKLIST: prefix = "\n[x] "; sample = "Tugas Selesai\n[ ] Tugas Belum Selesai"; suffix = "\n"; break;
+        case RTE_CMD_QUOTE: prefix = "\n> "; sample = "Catatan Khusus: Penting untuk diperhatikan"; suffix = "\n"; break;
+        case RTE_CMD_CODE: prefix = "\n```\n"; sample = "// Masukkan Kode atau Formula di sini\n"; suffix = "```\n"; break;
+        case RTE_CMD_HR: prefix = "\n---\n"; sample = ""; suffix = ""; break;
+        case RTE_CMD_COLOR_RED: prefix = "<color:#ef4444>"; sample = "Teks Warna Merah"; suffix = "</color>"; break;
+        case RTE_CMD_COLOR_BLUE: prefix = "<color:#3b82f6>"; sample = "Teks Warna Biru"; suffix = "</color>"; break;
+        case RTE_CMD_COLOR_GREEN: prefix = "<color:#22c55e>"; sample = "Teks Warna Hijau"; suffix = "</color>"; break;
+        case RTE_CMD_COLOR_PURPLE: prefix = "<color:#a855f7>"; sample = "Teks Warna Ungu"; suffix = "</color>"; break;
+        case RTE_CMD_ALIGN_LEFT: prefix = "\n<align:left>"; sample = "Teks Rata Kiri"; suffix = "</align>\n"; break;
+        case RTE_CMD_ALIGN_CENTER: prefix = "\n<align:center>"; sample = "Teks Rata Tengah"; suffix = "</align>\n"; break;
+        case RTE_CMD_ALIGN_RIGHT: prefix = "\n<align:right>"; sample = "Teks Rata Kanan"; suffix = "</align>\n"; break;
+        default: break;
+    }
+
     size_t len = strlen(buffer);
-    size_t pref_len = strlen(prefix);
-    size_t suff_len = strlen(suffix);
+    size_t p_len = strlen(prefix);
+    size_t s_len = strlen(sample);
+    size_t suf_len = strlen(suffix);
 
-    const char *sample = "teks";
-    if (strcmp(prefix, "\n# ") == 0) sample = "Judul Utama";
-    else if (strcmp(prefix, "\n## ") == 0) sample = "Sub Judul";
-    else if (strcmp(prefix, "\n- ") == 0) sample = "Poin Catatan";
-    else if (strcmp(prefix, "\n[x] ") == 0) sample = "Tugas Selesai";
-    else if (strcmp(prefix, "\n> ") == 0) sample = "Catatan Khusus";
-
-    size_t sample_len = strlen(sample);
-
-    if (len + pref_len + sample_len + suff_len + 1 < max_size) {
+    if (len + p_len + s_len + suf_len + 1 < max_size) {
         strcat(buffer, prefix);
         strcat(buffer, sample);
         strcat(buffer, suffix);
+    }
+}
+
+static void parse_and_render_line_tags(struct nk_context *ctx, const char *line_str, struct nk_color default_color) {
+    if (!line_str || strlen(line_str) == 0) return;
+
+    // Custom inline color tag parser <color:#HEX>
+    const char *color_tag = strstr(line_str, "<color:#");
+    if (color_tag) {
+        char hex_code[8] = {0};
+        if (strlen(color_tag + 8) >= 6) {
+            strncpy(hex_code, color_tag + 8, 6);
+            hex_code[6] = '\0';
+            
+            unsigned int r = 255, g = 255, b = 255;
+            if (sscanf(hex_code, "%02x%02x%02x", &r, &g, &b) == 3) {
+                const char *tag_end = strstr(color_tag, "</color>");
+                const char *text_start = strchr(color_tag, '>') ? strchr(color_tag, '>') + 1 : color_tag + 15;
+                
+                if (tag_end && text_start < tag_end) {
+                    char inner_text[256];
+                    size_t t_len = tag_end - text_start;
+                    if (t_len >= sizeof(inner_text)) t_len = sizeof(inner_text) - 1;
+                    memcpy(inner_text, text_start, t_len);
+                    inner_text[t_len] = '\0';
+
+                    char clean_inner[256];
+                    int c_idx = 0;
+                    for (size_t i = 0; i < strlen(inner_text); i++) {
+                        if (inner_text[i] == '<') {
+                            while (i < strlen(inner_text) && inner_text[i] != '>') i++;
+                        } else {
+                            if (c_idx < (int)sizeof(clean_inner) - 1) clean_inner[c_idx++] = inner_text[i];
+                        }
+                    }
+                    clean_inner[c_idx] = '\0';
+
+                    nk_label_colored(ctx, clean_inner, NK_TEXT_LEFT, nk_rgb(r, g, b));
+                    return;
+                }
+            }
+        }
+    }
+
+    // Strip inline html tags for clean visual rendering
+    char clean_line[512];
+    int c_idx = 0;
+    for (size_t i = 0; i < strlen(line_str); i++) {
+        if (line_str[i] == '<') {
+            while (i < strlen(line_str) && line_str[i] != '>') i++;
+        } else if (line_str[i] == '*' && i + 1 < strlen(line_str) && line_str[i+1] == '*') {
+            i++;
+        } else {
+            if (c_idx < (int)sizeof(clean_line) - 1) clean_line[c_idx++] = line_str[i];
+        }
+    }
+    clean_line[c_idx] = '\0';
+
+    if (strlen(clean_line) > 0) {
+        nk_label_colored(ctx, clean_line, NK_TEXT_LEFT, default_color);
     }
 }
 
@@ -181,6 +328,7 @@ static void render_rich_text_content(struct nk_context *ctx, const char *text, c
     char line_buf[512];
     const char *p = text;
     int line_idx = 0;
+    bool in_code_block = false;
 
     while (*p) {
         const char *line_start = p;
@@ -206,146 +354,211 @@ static void render_rich_text_content(struct nk_context *ctx, const char *text, c
             continue;
         }
 
+        if (strncmp(line_buf, "```", 3) == 0) {
+            in_code_block = !in_code_block;
+            nk_layout_row_dynamic(ctx, 2, 1);
+            nk_rule_horizontal(ctx, nk_rgb(234, 179, 8), 1);
+            continue;
+        }
+
+        if (in_code_block) {
+            nk_layout_row_dynamic(ctx, 22, 1);
+            nk_label_colored(ctx, line_buf, NK_TEXT_LEFT, nk_rgb(234, 179, 8));
+            continue;
+        }
+
+        if (strcmp(line_buf, "---") == 0 || strcmp(line_buf, "***") == 0) {
+            nk_layout_row_dynamic(ctx, 6, 1);
+            nk_rule_horizontal(ctx, g_theme_border, 1);
+            continue;
+        }
+
         // Header 1: "# "
         if (strncmp(line_buf, "# ", 2) == 0) {
-            nk_layout_row_dynamic(ctx, 24, 1);
-            nk_label_colored(ctx, line_buf + 2, NK_TEXT_LEFT, g_theme_text_header);
+            nk_layout_row_dynamic(ctx, 28, 1);
+            parse_and_render_line_tags(ctx, line_buf + 2, g_theme_text_header);
+            nk_layout_row_dynamic(ctx, 2, 1);
+            nk_rule_horizontal(ctx, g_theme_primary, 1);
         }
         // Header 2: "## "
         else if (strncmp(line_buf, "## ", 3) == 0) {
-            nk_layout_row_dynamic(ctx, 22, 1);
-            nk_label_colored(ctx, line_buf + 3, NK_TEXT_LEFT, g_theme_primary);
+            nk_layout_row_dynamic(ctx, 24, 1);
+            parse_and_render_line_tags(ctx, line_buf + 3, g_theme_primary);
         }
         // Header 3: "### "
         else if (strncmp(line_buf, "### ", 4) == 0) {
-            nk_layout_row_dynamic(ctx, 20, 1);
-            nk_label_colored(ctx, line_buf + 4, NK_TEXT_LEFT, g_theme_accent);
+            nk_layout_row_dynamic(ctx, 22, 1);
+            parse_and_render_line_tags(ctx, line_buf + 4, g_theme_accent);
         }
         // Bullet item: "- " or "* "
         else if (strncmp(line_buf, "- ", 2) == 0 || strncmp(line_buf, "* ", 2) == 0) {
-            nk_layout_row_template_begin(ctx, 20);
-            nk_layout_row_template_push_static(ctx, 18);
+            nk_layout_row_template_begin(ctx, 22);
+            nk_layout_row_template_push_static(ctx, 20);
             nk_layout_row_template_push_dynamic(ctx);
             nk_layout_row_template_end(ctx);
             nk_label_colored(ctx, "•", NK_TEXT_LEFT, g_theme_primary);
-            nk_label(ctx, line_buf + 2, NK_TEXT_LEFT);
+            parse_and_render_line_tags(ctx, line_buf + 2, g_theme_text_header);
+        }
+        // Numbered list item: e.g. "1. "
+        else if (line_len >= 3 && line_buf[0] >= '0' && line_buf[0] <= '9' && line_buf[1] == '.' && line_buf[2] == ' ') {
+            nk_layout_row_template_begin(ctx, 22);
+            nk_layout_row_template_push_static(ctx, 24);
+            nk_layout_row_template_push_dynamic(ctx);
+            nk_layout_row_template_end(ctx);
+            char num_str[8];
+            snprintf(num_str, sizeof(num_str), "%c.", line_buf[0]);
+            nk_label_colored(ctx, num_str, NK_TEXT_LEFT, g_theme_primary);
+            parse_and_render_line_tags(ctx, line_buf + 3, g_theme_text_header);
         }
         // Checkboxes: "[x] " or "[X] "
         else if (strncmp(line_buf, "[x] ", 4) == 0 || strncmp(line_buf, "[X] ", 4) == 0) {
-            nk_layout_row_template_begin(ctx, 20);
-            nk_layout_row_template_push_static(ctx, 28);
+            nk_layout_row_template_begin(ctx, 22);
+            nk_layout_row_template_push_static(ctx, 30);
             nk_layout_row_template_push_dynamic(ctx);
             nk_layout_row_template_end(ctx);
             nk_label_colored(ctx, "[✓]", NK_TEXT_LEFT, nk_rgb(34, 197, 94));
-            nk_label(ctx, line_buf + 4, NK_TEXT_LEFT);
+            parse_and_render_line_tags(ctx, line_buf + 4, g_theme_text_header);
         }
         // Unchecked: "[ ] "
         else if (strncmp(line_buf, "[ ] ", 4) == 0) {
-            nk_layout_row_template_begin(ctx, 20);
-            nk_layout_row_template_push_static(ctx, 28);
+            nk_layout_row_template_begin(ctx, 22);
+            nk_layout_row_template_push_static(ctx, 30);
             nk_layout_row_template_push_dynamic(ctx);
             nk_layout_row_template_end(ctx);
             nk_label_colored(ctx, "[  ]", NK_TEXT_LEFT, g_theme_text_muted);
-            nk_label(ctx, line_buf + 4, NK_TEXT_LEFT);
+            parse_and_render_line_tags(ctx, line_buf + 4, g_theme_text_muted);
         }
         // Quote / Callout: "> "
         else if (strncmp(line_buf, "> ", 2) == 0) {
-            nk_layout_row_dynamic(ctx, 24, 1);
+            nk_layout_row_dynamic(ctx, 28, 1);
             char q_grp[64];
             snprintf(q_grp, sizeof(q_grp), "rte_q_%s_%d", group_id_prefix, line_idx);
-            if (nk_group_begin(ctx, q_grp, NK_WINDOW_NO_SCROLLBAR)) {
-                nk_layout_row_dynamic(ctx, 18, 1);
-                nk_label_colored(ctx, line_buf + 2, NK_TEXT_LEFT, g_theme_accent);
+            if (nk_group_begin(ctx, q_grp, NK_WINDOW_BORDER | NK_WINDOW_NO_SCROLLBAR)) {
+                nk_layout_row_dynamic(ctx, 20, 1);
+                parse_and_render_line_tags(ctx, line_buf + 2, g_theme_accent);
                 nk_group_end(ctx);
             }
         }
-        // Code line
+        // Inline code line
         else if (line_buf[0] == '`' || strchr(line_buf, '`') != NULL) {
-            nk_layout_row_dynamic(ctx, 20, 1);
-            nk_label_colored(ctx, line_buf, NK_TEXT_LEFT, nk_rgb(234, 179, 8));
-        }
-        // Bold / Header highlight line
-        else if (strstr(line_buf, "**") != NULL) {
-            nk_layout_row_dynamic(ctx, 20, 1);
-            nk_label_colored(ctx, line_buf, NK_TEXT_LEFT, g_theme_text_header);
+            nk_layout_row_dynamic(ctx, 22, 1);
+            parse_and_render_line_tags(ctx, line_buf, nk_rgb(234, 179, 8));
         }
         // Plain line
         else {
-            nk_layout_row_dynamic(ctx, 20, 1);
-            nk_label(ctx, line_buf, NK_TEXT_LEFT);
+            nk_layout_row_dynamic(ctx, 22, 1);
+            parse_and_render_line_tags(ctx, line_buf, g_theme_text_header);
         }
     }
 }
 
 static void draw_rich_text_editor(struct nk_context *ctx, const char *label, char *buffer, size_t max_size, float edit_height, int *mode, const char *group_id) {
-    // 1. Header label and Mode Switcher
-    nk_layout_row_template_begin(ctx, 25);
+    // 1. Header Title & Mode Switcher
+    nk_layout_row_template_begin(ctx, 28);
     nk_layout_row_template_push_dynamic(ctx);
-    nk_layout_row_template_push_static(ctx, 210);
+    nk_layout_row_template_push_static(ctx, 330);
     nk_layout_row_template_end(ctx);
 
     char header_label[128];
-    snprintf(header_label, sizeof(header_label), "%s  [Rich Text]", label);
+    snprintf(header_label, sizeof(header_label), "%s  [WYSIWYG Rich Text Editor]", label);
     nk_label_colored(ctx, header_label, NK_TEXT_LEFT, g_theme_text_header);
 
     char mode_grp[64];
     snprintf(mode_grp, sizeof(mode_grp), "rte_hdr_%s", group_id);
     if (nk_group_begin(ctx, mode_grp, NK_WINDOW_NO_SCROLLBAR)) {
-        nk_layout_row_dynamic(ctx, 22, 3);
-        if (nk_button_label(ctx, *mode == 0 ? "[Edit]" : "Edit")) *mode = 0;
-        if (nk_button_label(ctx, *mode == 1 ? "[Preview]" : "Preview")) *mode = 1;
-        if (nk_button_label(ctx, *mode == 2 ? "[Split]" : "Split")) *mode = 2;
+        nk_layout_row_dynamic(ctx, 24, 3);
+        if (nk_button_label(ctx, *mode == 0 ? "[ Visual Canvas ]" : "Visual Canvas")) *mode = 0;
+        if (nk_button_label(ctx, *mode == 1 ? "[ Raw Teks ]" : "Raw Teks")) *mode = 1;
+        if (nk_button_label(ctx, *mode == 2 ? "[ Split View ]" : "Split View")) *mode = 2;
         nk_group_end(ctx);
     }
 
-    // 2. Formatting Toolbar (when in Edit or Split mode)
-    if (*mode == 0 || *mode == 2) {
-        nk_layout_row_dynamic(ctx, 25, 10);
-        if (nk_button_label(ctx, "B")) rte_insert_markup(buffer, max_size, "**", "**");
-        if (nk_button_label(ctx, "I")) rte_insert_markup(buffer, max_size, "*", "*");
-        if (nk_button_label(ctx, "U")) rte_insert_markup(buffer, max_size, "<u>", "</u>");
-        if (nk_button_label(ctx, "H1")) rte_insert_markup(buffer, max_size, "\n# ", "");
-        if (nk_button_label(ctx, "H2")) rte_insert_markup(buffer, max_size, "\n## ", "");
-        if (nk_button_label(ctx, "- List")) rte_insert_markup(buffer, max_size, "\n- ", "");
-        if (nk_button_label(ctx, "[x] Check")) rte_insert_markup(buffer, max_size, "\n[x] ", "");
-        if (nk_button_label(ctx, "> Quote")) rte_insert_markup(buffer, max_size, "\n> ", "");
-        if (nk_button_label(ctx, "`Code`")) rte_insert_markup(buffer, max_size, "`", "`");
-        if (nk_button_label(ctx, "+ Tmpl")) rte_insert_markup(buffer, max_size, "TEMPLATE", "");
-    }
+    // 2. Professional Formatting Toolbar (Row 1: Text Style & Structure)
+    nk_layout_row_dynamic(ctx, 28, 13);
+    if (nk_button_label(ctx, ICON_RTE_BOLD " B")) rte_apply_command(buffer, max_size, RTE_CMD_BOLD);
+    if (nk_button_label(ctx, ICON_RTE_ITALIC " I")) rte_apply_command(buffer, max_size, RTE_CMD_ITALIC);
+    if (nk_button_label(ctx, ICON_RTE_UNDERLINE " U")) rte_apply_command(buffer, max_size, RTE_CMD_UNDERLINE);
+    if (nk_button_label(ctx, ICON_RTE_STRIKE " S")) rte_apply_command(buffer, max_size, RTE_CMD_STRIKE);
+    if (nk_button_label(ctx, ICON_RTE_HEADING " H1")) rte_apply_command(buffer, max_size, RTE_CMD_H1);
+    if (nk_button_label(ctx, ICON_RTE_HEADING " H2")) rte_apply_command(buffer, max_size, RTE_CMD_H2);
+    if (nk_button_label(ctx, ICON_RTE_HEADING " H3")) rte_apply_command(buffer, max_size, RTE_CMD_H3);
+    if (nk_button_label(ctx, ICON_RTE_LIST_UL " Poin")) rte_apply_command(buffer, max_size, RTE_CMD_LIST_UL);
+    if (nk_button_label(ctx, ICON_RTE_LIST_OL " Angka")) rte_apply_command(buffer, max_size, RTE_CMD_LIST_OL);
+    if (nk_button_label(ctx, ICON_RTE_CHECK " Check")) rte_apply_command(buffer, max_size, RTE_CMD_CHECKLIST);
+    if (nk_button_label(ctx, ICON_RTE_QUOTE " Quote")) rte_apply_command(buffer, max_size, RTE_CMD_QUOTE);
+    if (nk_button_label(ctx, ICON_RTE_CODE " Code")) rte_apply_command(buffer, max_size, RTE_CMD_CODE);
+    if (nk_button_label(ctx, "― HR")) rte_apply_command(buffer, max_size, RTE_CMD_HR);
 
-    // 3. Editor / Preview view
+    // Row 2: Colors, Alignment & Tools
+    nk_layout_row_dynamic(ctx, 28, 8);
+    if (nk_button_label(ctx, "🔴 Merah")) rte_apply_command(buffer, max_size, RTE_CMD_COLOR_RED);
+    if (nk_button_label(ctx, "🔵 Biru")) rte_apply_command(buffer, max_size, RTE_CMD_COLOR_BLUE);
+    if (nk_button_label(ctx, "🟢 Hijau")) rte_apply_command(buffer, max_size, RTE_CMD_COLOR_GREEN);
+    if (nk_button_label(ctx, "🟣 Ungu")) rte_apply_command(buffer, max_size, RTE_CMD_COLOR_PURPLE);
+    if (nk_button_label(ctx, ICON_RTE_ALIGN_LEFT " Kiri")) rte_apply_command(buffer, max_size, RTE_CMD_ALIGN_LEFT);
+    if (nk_button_label(ctx, ICON_RTE_ALIGN_CENTER " Tengah")) rte_apply_command(buffer, max_size, RTE_CMD_ALIGN_CENTER);
+    if (nk_button_label(ctx, ICON_RTE_ERASER " Reset")) rte_apply_command(buffer, max_size, RTE_CMD_CLEAR);
+    if (nk_button_label(ctx, ICON_RTE_TEMPLATE " Template")) rte_apply_command(buffer, max_size, RTE_CMD_TMPL_JOURNAL);
+
+    // 3. Main Workspace Area according to selected mode
     if (*mode == 0) {
         nk_layout_row_dynamic(ctx, edit_height, 1);
         nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX, buffer, max_size, nk_filter_default);
-    } else if (*mode == 1) {
+
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label_colored(ctx, "PRATINJAU VISUAL KANVAS WYSIWYG:", NK_TEXT_LEFT, g_theme_text_muted);
+
         char preview_grp[64];
-        snprintf(preview_grp, sizeof(preview_grp), "rte_prev_%s", group_id);
-        nk_layout_row_dynamic(ctx, edit_height + 25, 1);
-        if (nk_group_begin(ctx, preview_grp, 0)) {
+        snprintf(preview_grp, sizeof(preview_grp), "rte_vis_%s", group_id);
+        nk_layout_row_dynamic(ctx, edit_height + 40, 1);
+        if (nk_group_begin(ctx, preview_grp, NK_WINDOW_BORDER)) {
             if (strlen(buffer) == 0) {
                 nk_layout_row_dynamic(ctx, 20, 1);
-                nk_label_colored(ctx, "(Teks masih kosong. Tuliskan teks di tab Edit...)", NK_TEXT_LEFT, g_theme_text_muted);
+                nk_label_colored(ctx, "(Kanvas visual kosong. Ketik teks atau gunakan tombol toolbar format di atas...)", NK_TEXT_LEFT, g_theme_text_muted);
             } else {
                 render_rich_text_content(ctx, buffer, group_id);
             }
             nk_group_end(ctx);
         }
+    } else if (*mode == 1) {
+        nk_layout_row_dynamic(ctx, edit_height + 60, 1);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX, buffer, max_size, nk_filter_default);
     } else {
-        nk_layout_row_dynamic(ctx, edit_height, 2);
+        nk_layout_row_dynamic(ctx, edit_height + 60, 2);
         nk_edit_string_zero_terminated(ctx, NK_EDIT_BOX, buffer, max_size, nk_filter_default);
 
         char preview_grp[64];
         snprintf(preview_grp, sizeof(preview_grp), "rte_split_%s", group_id);
-        if (nk_group_begin(ctx, preview_grp, 0)) {
+        if (nk_group_begin(ctx, preview_grp, NK_WINDOW_BORDER)) {
             if (strlen(buffer) == 0) {
                 nk_layout_row_dynamic(ctx, 20, 1);
-                nk_label_colored(ctx, "(Live preview...)", NK_TEXT_LEFT, g_theme_text_muted);
+                nk_label_colored(ctx, "(Pratinjau langsung...)", NK_TEXT_LEFT, g_theme_text_muted);
             } else {
                 render_rich_text_content(ctx, buffer, group_id);
             }
             nk_group_end(ctx);
         }
     }
+
+    // 4. Status Bar Metrics: Words, Characters, Lines
+    int char_count = (int)strlen(buffer);
+    int word_count = 0;
+    int line_count = 1;
+    bool in_word = false;
+    for (int i = 0; i < char_count; i++) {
+        if (buffer[i] == '\n') line_count++;
+        if (buffer[i] == ' ' || buffer[i] == '\n' || buffer[i] == '\t') {
+            in_word = false;
+        } else if (!in_word) {
+            in_word = true;
+            word_count++;
+        }
+    }
+
+    nk_layout_row_dynamic(ctx, 20, 1);
+    char status_str[128];
+    snprintf(status_str, sizeof(status_str), "📄 Total Karakter: %d | 📝 Jumlah Kata: %d | 📑 Total Baris: %d", char_count, word_count, line_count);
+    nk_label_colored(ctx, status_str, NK_TEXT_RIGHT, g_theme_text_muted);
 }
 
 // Data loading manager
