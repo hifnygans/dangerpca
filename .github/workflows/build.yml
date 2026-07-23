@@ -125,15 +125,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}
-          name: ${{ startsWith(github.ref, 'refs/tags/') && format('Release {0}', github.ref_name) || 'DangerPCA ERP Enterprise (Latest Build)' }}
-          body: |
-            ## DangerPCA ERP Enterprise Pro Automated Build
-            Rilis ini otomatis diperbarui setiap kali terjadi commit baru di repositori git.
-
-            ### File Biner yang Tersedia:
-            - **Windows (x64 standalone):** `dangerpca-windows.exe`
-            - **Linux (Debian/Ubuntu Package):** `*.deb`
-            - **Linux (Standalone Binary):** `dangerpca-linux`
+          name: DangerPCA ERP Pro - Special Release for Ica
+          body: Rilis disini khusus buat Ica.
           files: |
             release-assets/*
           make_latest: "true"

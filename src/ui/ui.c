@@ -96,8 +96,17 @@ static int g_selected_student_idx = 0;
 static int g_selected_tp_idx = 0;
 static char g_subject_filter[100] = "Matematika";
 
-// Theme colors (Global for UI & Rich Text Editor)
-static bool g_light_mode = false;
+// Theme Presets & UX Color Palettes
+typedef enum {
+    THEME_INDIGO_LIGHT = 0,
+    THEME_EMERALD_LIGHT,
+    THEME_AMBER_LIGHT,
+    THEME_SLATE_DARK,
+    THEME_CYBER_DARK
+} ThemePreset;
+
+static ThemePreset g_theme_preset = THEME_INDIGO_LIGHT;
+static bool g_light_mode = true; // Default Mode Terang
 static struct nk_color g_theme_text_header;
 static struct nk_color g_theme_text_muted;
 static struct nk_color g_theme_border;
@@ -628,79 +637,193 @@ static void load_tab_data(SidebarMenu menu) {
     }
 }
 
-static void set_material_dark_theme(struct nk_context *ctx) {
+static void apply_theme_preset(struct nk_context *ctx, ThemePreset preset) {
+    g_theme_preset = preset;
     struct nk_color table[NK_COLOR_COUNT];
-    table[NK_COLOR_TEXT] = nk_rgba(240, 240, 240, 255);
-    table[NK_COLOR_WINDOW] = nk_rgba(18, 18, 18, 255);
-    table[NK_COLOR_HEADER] = nk_rgba(30, 30, 30, 255);
-    table[NK_COLOR_BORDER] = nk_rgba(40, 40, 40, 255);
-    table[NK_COLOR_BUTTON] = nk_rgba(30, 136, 229, 255);
-    table[NK_COLOR_BUTTON_HOVER] = nk_rgba(33, 150, 243, 255);
-    table[NK_COLOR_BUTTON_ACTIVE] = nk_rgba(21, 101, 192, 255);
-    table[NK_COLOR_TOGGLE] = nk_rgba(45, 45, 45, 255);
-    table[NK_COLOR_TOGGLE_HOVER] = nk_rgba(33, 150, 243, 255);
-    table[NK_COLOR_TOGGLE_CURSOR] = nk_rgba(33, 150, 243, 255);
-    table[NK_COLOR_SELECT] = nk_rgba(45, 45, 45, 255);
-    table[NK_COLOR_SELECT_ACTIVE] = nk_rgba(33, 150, 243, 255);
-    table[NK_COLOR_SLIDER] = nk_rgba(45, 45, 45, 255);
-    table[NK_COLOR_SLIDER_CURSOR] = nk_rgba(33, 150, 243, 255);
-    table[NK_COLOR_SLIDER_CURSOR_HOVER] = nk_rgba(100, 181, 246, 255);
-    table[NK_COLOR_SLIDER_CURSOR_ACTIVE] = nk_rgba(21, 101, 192, 255);
-    table[NK_COLOR_PROPERTY] = nk_rgba(30, 30, 30, 255);
-    table[NK_COLOR_EDIT] = nk_rgba(30, 30, 30, 255);
-    table[NK_COLOR_EDIT_CURSOR] = nk_rgba(240, 240, 240, 255);
-    table[NK_COLOR_COMBO] = nk_rgba(30, 30, 30, 255);
-    table[NK_COLOR_CHART] = nk_rgba(30, 30, 30, 255);
-    table[NK_COLOR_CHART_COLOR] = nk_rgba(33, 150, 243, 255);
-    table[NK_COLOR_CHART_COLOR_HIGHLIGHT] = nk_rgba(233, 30, 99, 255);
-    table[NK_COLOR_SCROLLBAR] = nk_rgba(18, 18, 18, 255);
-    table[NK_COLOR_SCROLLBAR_CURSOR] = nk_rgba(50, 50, 50, 255);
-    table[NK_COLOR_SCROLLBAR_CURSOR_HOVER] = nk_rgba(70, 70, 70, 255);
-    table[NK_COLOR_SCROLLBAR_CURSOR_ACTIVE] = nk_rgba(33, 150, 243, 255);
-    table[NK_COLOR_TAB_HEADER] = nk_rgba(30, 30, 30, 255);
-    nk_style_from_table(ctx, table);
-    
-    ctx->style.window.rounding = 8.0f;
-    ctx->style.button.rounding = 4.0f;
-    ctx->style.edit.rounding = 4.0f;
-    ctx->style.property.rounding = 4.0f;
-    ctx->style.combo.rounding = 4.0f;
-    ctx->style.tab.rounding = 4.0f;
-    ctx->style.window.header.align = NK_HEADER_LEFT;
-}
 
-static void set_material_light_theme(struct nk_context *ctx) {
-    struct nk_color table[NK_COLOR_COUNT];
-    table[NK_COLOR_TEXT] = nk_rgba(33, 33, 33, 255);
-    table[NK_COLOR_WINDOW] = nk_rgba(245, 245, 247, 255);
-    table[NK_COLOR_HEADER] = nk_rgba(255, 255, 255, 255);
-    table[NK_COLOR_BORDER] = nk_rgba(224, 224, 224, 255);
-    table[NK_COLOR_BUTTON] = nk_rgba(63, 81, 181, 255);
-    table[NK_COLOR_BUTTON_HOVER] = nk_rgba(92, 107, 192, 255);
-    table[NK_COLOR_BUTTON_ACTIVE] = nk_rgba(48, 63, 159, 255);
-    table[NK_COLOR_TOGGLE] = nk_rgba(224, 224, 224, 255);
-    table[NK_COLOR_TOGGLE_HOVER] = nk_rgba(63, 81, 181, 255);
-    table[NK_COLOR_TOGGLE_CURSOR] = nk_rgba(63, 81, 181, 255);
-    table[NK_COLOR_SELECT] = nk_rgba(232, 234, 246, 255);
-    table[NK_COLOR_SELECT_ACTIVE] = nk_rgba(63, 81, 181, 255);
-    table[NK_COLOR_SLIDER] = nk_rgba(224, 224, 224, 255);
-    table[NK_COLOR_SLIDER_CURSOR] = nk_rgba(63, 81, 181, 255);
-    table[NK_COLOR_SLIDER_CURSOR_HOVER] = nk_rgba(92, 107, 192, 255);
-    table[NK_COLOR_SLIDER_CURSOR_ACTIVE] = nk_rgba(48, 63, 159, 255);
-    table[NK_COLOR_PROPERTY] = nk_rgba(255, 255, 255, 255);
-    table[NK_COLOR_EDIT] = nk_rgba(255, 255, 255, 255);
-    table[NK_COLOR_EDIT_CURSOR] = nk_rgba(33, 33, 33, 255);
-    table[NK_COLOR_COMBO] = nk_rgba(255, 255, 255, 255);
-    table[NK_COLOR_CHART] = nk_rgba(255, 255, 255, 255);
-    table[NK_COLOR_CHART_COLOR] = nk_rgba(63, 81, 181, 255);
-    table[NK_COLOR_CHART_COLOR_HIGHLIGHT] = nk_rgba(233, 30, 99, 255);
-    table[NK_COLOR_SCROLLBAR] = nk_rgba(240, 240, 240, 255);
-    table[NK_COLOR_SCROLLBAR_CURSOR] = nk_rgba(200, 200, 200, 255);
-    table[NK_COLOR_SCROLLBAR_CURSOR_HOVER] = nk_rgba(180, 180, 180, 255);
-    table[NK_COLOR_SCROLLBAR_CURSOR_ACTIVE] = nk_rgba(63, 81, 181, 255);
-    table[NK_COLOR_TAB_HEADER] = nk_rgba(240, 240, 240, 255);
+    if (preset == THEME_INDIGO_LIGHT) {
+        g_light_mode = true;
+        table[NK_COLOR_TEXT] = nk_rgba(15, 23, 42, 255);
+        table[NK_COLOR_WINDOW] = nk_rgba(248, 250, 252, 255);
+        table[NK_COLOR_HEADER] = nk_rgba(255, 255, 255, 255);
+        table[NK_COLOR_BORDER] = nk_rgba(226, 232, 240, 255);
+        table[NK_COLOR_BUTTON] = nk_rgba(79, 70, 229, 255);
+        table[NK_COLOR_BUTTON_HOVER] = nk_rgba(99, 102, 241, 255);
+        table[NK_COLOR_BUTTON_ACTIVE] = nk_rgba(67, 56, 202, 255);
+        table[NK_COLOR_TOGGLE] = nk_rgba(226, 232, 240, 255);
+        table[NK_COLOR_TOGGLE_HOVER] = nk_rgba(79, 70, 229, 255);
+        table[NK_COLOR_TOGGLE_CURSOR] = nk_rgba(79, 70, 229, 255);
+        table[NK_COLOR_SELECT] = nk_rgba(238, 242, 255, 255);
+        table[NK_COLOR_SELECT_ACTIVE] = nk_rgba(79, 70, 229, 255);
+        table[NK_COLOR_SLIDER] = nk_rgba(226, 232, 240, 255);
+        table[NK_COLOR_SLIDER_CURSOR] = nk_rgba(79, 70, 229, 255);
+        table[NK_COLOR_SLIDER_CURSOR_HOVER] = nk_rgba(99, 102, 241, 255);
+        table[NK_COLOR_SLIDER_CURSOR_ACTIVE] = nk_rgba(67, 56, 202, 255);
+        table[NK_COLOR_PROPERTY] = nk_rgba(255, 255, 255, 255);
+        table[NK_COLOR_EDIT] = nk_rgba(255, 255, 255, 255);
+        table[NK_COLOR_EDIT_CURSOR] = nk_rgba(15, 23, 42, 255);
+        table[NK_COLOR_COMBO] = nk_rgba(255, 255, 255, 255);
+        table[NK_COLOR_CHART] = nk_rgba(255, 255, 255, 255);
+        table[NK_COLOR_CHART_COLOR] = nk_rgba(79, 70, 229, 255);
+        table[NK_COLOR_CHART_COLOR_HIGHLIGHT] = nk_rgba(236, 72, 153, 255);
+        table[NK_COLOR_SCROLLBAR] = nk_rgba(241, 245, 249, 255);
+        table[NK_COLOR_SCROLLBAR_CURSOR] = nk_rgba(203, 213, 225, 255);
+        table[NK_COLOR_SCROLLBAR_CURSOR_HOVER] = nk_rgba(148, 163, 184, 255);
+        table[NK_COLOR_SCROLLBAR_CURSOR_ACTIVE] = nk_rgba(79, 70, 229, 255);
+        table[NK_COLOR_TAB_HEADER] = nk_rgba(241, 245, 249, 255);
+        
+        g_theme_text_header = nk_rgb(15, 23, 42);
+        g_theme_text_muted = nk_rgb(100, 116, 139);
+        g_theme_border = nk_rgb(226, 232, 240);
+        g_theme_primary = nk_rgb(79, 70, 229);
+        g_theme_accent = nk_rgb(236, 72, 153);
+    } else if (preset == THEME_EMERALD_LIGHT) {
+        g_light_mode = true;
+        table[NK_COLOR_TEXT] = nk_rgba(6, 78, 59, 255);
+        table[NK_COLOR_WINDOW] = nk_rgba(240, 253, 244, 255);
+        table[NK_COLOR_HEADER] = nk_rgba(255, 255, 255, 255);
+        table[NK_COLOR_BORDER] = nk_rgba(209, 250, 229, 255);
+        table[NK_COLOR_BUTTON] = nk_rgba(16, 185, 129, 255);
+        table[NK_COLOR_BUTTON_HOVER] = nk_rgba(52, 211, 153, 255);
+        table[NK_COLOR_BUTTON_ACTIVE] = nk_rgba(5, 150, 105, 255);
+        table[NK_COLOR_TOGGLE] = nk_rgba(209, 250, 229, 255);
+        table[NK_COLOR_TOGGLE_HOVER] = nk_rgba(16, 185, 129, 255);
+        table[NK_COLOR_TOGGLE_CURSOR] = nk_rgba(16, 185, 129, 255);
+        table[NK_COLOR_SELECT] = nk_rgba(236, 253, 245, 255);
+        table[NK_COLOR_SELECT_ACTIVE] = nk_rgba(16, 185, 129, 255);
+        table[NK_COLOR_SLIDER] = nk_rgba(209, 250, 229, 255);
+        table[NK_COLOR_SLIDER_CURSOR] = nk_rgba(16, 185, 129, 255);
+        table[NK_COLOR_SLIDER_CURSOR_HOVER] = nk_rgba(52, 211, 153, 255);
+        table[NK_COLOR_SLIDER_CURSOR_ACTIVE] = nk_rgba(5, 150, 105, 255);
+        table[NK_COLOR_PROPERTY] = nk_rgba(255, 255, 255, 255);
+        table[NK_COLOR_EDIT] = nk_rgba(255, 255, 255, 255);
+        table[NK_COLOR_EDIT_CURSOR] = nk_rgba(6, 78, 59, 255);
+        table[NK_COLOR_COMBO] = nk_rgba(255, 255, 255, 255);
+        table[NK_COLOR_CHART] = nk_rgba(255, 255, 255, 255);
+        table[NK_COLOR_CHART_COLOR] = nk_rgba(16, 185, 129, 255);
+        table[NK_COLOR_CHART_COLOR_HIGHLIGHT] = nk_rgba(245, 158, 11, 255);
+        table[NK_COLOR_SCROLLBAR] = nk_rgba(236, 253, 245, 255);
+        table[NK_COLOR_SCROLLBAR_CURSOR] = nk_rgba(167, 243, 208, 255);
+        table[NK_COLOR_SCROLLBAR_CURSOR_HOVER] = nk_rgba(110, 231, 183, 255);
+        table[NK_COLOR_SCROLLBAR_CURSOR_ACTIVE] = nk_rgba(16, 185, 129, 255);
+        table[NK_COLOR_TAB_HEADER] = nk_rgba(236, 253, 245, 255);
+
+        g_theme_text_header = nk_rgb(6, 78, 59);
+        g_theme_text_muted = nk_rgb(75, 85, 99);
+        g_theme_border = nk_rgb(209, 250, 229);
+        g_theme_primary = nk_rgb(16, 185, 129);
+        g_theme_accent = nk_rgb(245, 158, 11);
+    } else if (preset == THEME_AMBER_LIGHT) {
+        g_light_mode = true;
+        table[NK_COLOR_TEXT] = nk_rgba(120, 53, 15, 255);
+        table[NK_COLOR_WINDOW] = nk_rgba(254, 252, 232, 255);
+        table[NK_COLOR_HEADER] = nk_rgba(255, 255, 255, 255);
+        table[NK_COLOR_BORDER] = nk_rgba(254, 240, 138, 255);
+        table[NK_COLOR_BUTTON] = nk_rgba(217, 119, 6, 255);
+        table[NK_COLOR_BUTTON_HOVER] = nk_rgba(245, 158, 11, 255);
+        table[NK_COLOR_BUTTON_ACTIVE] = nk_rgba(180, 83, 9, 255);
+        table[NK_COLOR_TOGGLE] = nk_rgba(254, 240, 138, 255);
+        table[NK_COLOR_TOGGLE_HOVER] = nk_rgba(217, 119, 6, 255);
+        table[NK_COLOR_TOGGLE_CURSOR] = nk_rgba(217, 119, 6, 255);
+        table[NK_COLOR_SELECT] = nk_rgba(254, 243, 199, 255);
+        table[NK_COLOR_SELECT_ACTIVE] = nk_rgba(217, 119, 6, 255);
+        table[NK_COLOR_SLIDER] = nk_rgba(254, 240, 138, 255);
+        table[NK_COLOR_SLIDER_CURSOR] = nk_rgba(217, 119, 6, 255);
+        table[NK_COLOR_SLIDER_CURSOR_HOVER] = nk_rgba(245, 158, 11, 255);
+        table[NK_COLOR_SLIDER_CURSOR_ACTIVE] = nk_rgba(180, 83, 9, 255);
+        table[NK_COLOR_PROPERTY] = nk_rgba(255, 255, 255, 255);
+        table[NK_COLOR_EDIT] = nk_rgba(255, 255, 255, 255);
+        table[NK_COLOR_EDIT_CURSOR] = nk_rgba(120, 53, 15, 255);
+        table[NK_COLOR_COMBO] = nk_rgba(255, 255, 255, 255);
+        table[NK_COLOR_CHART] = nk_rgba(255, 255, 255, 255);
+        table[NK_COLOR_CHART_COLOR] = nk_rgba(217, 119, 6, 255);
+        table[NK_COLOR_CHART_COLOR_HIGHLIGHT] = nk_rgba(239, 68, 68, 255);
+        table[NK_COLOR_SCROLLBAR] = nk_rgba(254, 243, 199, 255);
+        table[NK_COLOR_SCROLLBAR_CURSOR] = nk_rgba(253, 230, 138, 255);
+        table[NK_COLOR_SCROLLBAR_CURSOR_HOVER] = nk_rgba(252, 211, 77, 255);
+        table[NK_COLOR_SCROLLBAR_CURSOR_ACTIVE] = nk_rgba(217, 119, 6, 255);
+        table[NK_COLOR_TAB_HEADER] = nk_rgba(254, 243, 199, 255);
+
+        g_theme_text_header = nk_rgb(120, 53, 15);
+        g_theme_text_muted = nk_rgb(146, 64, 14);
+        g_theme_border = nk_rgb(254, 240, 138);
+        g_theme_primary = nk_rgb(217, 119, 6);
+        g_theme_accent = nk_rgb(239, 68, 68);
+    } else if (preset == THEME_SLATE_DARK) {
+        g_light_mode = false;
+        table[NK_COLOR_TEXT] = nk_rgba(241, 245, 249, 255);
+        table[NK_COLOR_WINDOW] = nk_rgba(15, 23, 42, 255);
+        table[NK_COLOR_HEADER] = nk_rgba(30, 41, 59, 255);
+        table[NK_COLOR_BORDER] = nk_rgba(51, 65, 85, 255);
+        table[NK_COLOR_BUTTON] = nk_rgba(56, 189, 248, 255);
+        table[NK_COLOR_BUTTON_HOVER] = nk_rgba(14, 165, 233, 255);
+        table[NK_COLOR_BUTTON_ACTIVE] = nk_rgba(2, 132, 199, 255);
+        table[NK_COLOR_TOGGLE] = nk_rgba(51, 65, 85, 255);
+        table[NK_COLOR_TOGGLE_HOVER] = nk_rgba(56, 189, 248, 255);
+        table[NK_COLOR_TOGGLE_CURSOR] = nk_rgba(56, 189, 248, 255);
+        table[NK_COLOR_SELECT] = nk_rgba(30, 41, 59, 255);
+        table[NK_COLOR_SELECT_ACTIVE] = nk_rgba(56, 189, 248, 255);
+        table[NK_COLOR_SLIDER] = nk_rgba(51, 65, 85, 255);
+        table[NK_COLOR_SLIDER_CURSOR] = nk_rgba(56, 189, 248, 255);
+        table[NK_COLOR_SLIDER_CURSOR_HOVER] = nk_rgba(14, 165, 233, 255);
+        table[NK_COLOR_SLIDER_CURSOR_ACTIVE] = nk_rgba(2, 132, 199, 255);
+        table[NK_COLOR_PROPERTY] = nk_rgba(30, 41, 59, 255);
+        table[NK_COLOR_EDIT] = nk_rgba(30, 41, 59, 255);
+        table[NK_COLOR_EDIT_CURSOR] = nk_rgba(241, 245, 249, 255);
+        table[NK_COLOR_COMBO] = nk_rgba(30, 41, 59, 255);
+        table[NK_COLOR_CHART] = nk_rgba(30, 41, 59, 255);
+        table[NK_COLOR_CHART_COLOR] = nk_rgba(56, 189, 248, 255);
+        table[NK_COLOR_CHART_COLOR_HIGHLIGHT] = nk_rgba(244, 63, 94, 255);
+        table[NK_COLOR_SCROLLBAR] = nk_rgba(15, 23, 42, 255);
+        table[NK_COLOR_SCROLLBAR_CURSOR] = nk_rgba(51, 65, 85, 255);
+        table[NK_COLOR_SCROLLBAR_CURSOR_HOVER] = nk_rgba(71, 85, 105, 255);
+        table[NK_COLOR_SCROLLBAR_CURSOR_ACTIVE] = nk_rgba(56, 189, 248, 255);
+        table[NK_COLOR_TAB_HEADER] = nk_rgba(30, 41, 59, 255);
+
+        g_theme_text_header = nk_rgb(241, 245, 249);
+        g_theme_text_muted = nk_rgb(148, 163, 184);
+        g_theme_border = nk_rgb(51, 65, 85);
+        g_theme_primary = nk_rgb(56, 189, 248);
+        g_theme_accent = nk_rgb(244, 63, 94);
+    } else { // THEME_CYBER_DARK
+        g_light_mode = false;
+        table[NK_COLOR_TEXT] = nk_rgba(243, 244, 246, 255);
+        table[NK_COLOR_WINDOW] = nk_rgba(10, 10, 20, 255);
+        table[NK_COLOR_HEADER] = nk_rgba(22, 24, 45, 255);
+        table[NK_COLOR_BORDER] = nk_rgba(46, 48, 85, 255);
+        table[NK_COLOR_BUTTON] = nk_rgba(139, 92, 246, 255);
+        table[NK_COLOR_BUTTON_HOVER] = nk_rgba(167, 139, 250, 255);
+        table[NK_COLOR_BUTTON_ACTIVE] = nk_rgba(124, 58, 237, 255);
+        table[NK_COLOR_TOGGLE] = nk_rgba(46, 48, 85, 255);
+        table[NK_COLOR_TOGGLE_HOVER] = nk_rgba(139, 92, 246, 255);
+        table[NK_COLOR_TOGGLE_CURSOR] = nk_rgba(139, 92, 246, 255);
+        table[NK_COLOR_SELECT] = nk_rgba(22, 24, 45, 255);
+        table[NK_COLOR_SELECT_ACTIVE] = nk_rgba(139, 92, 246, 255);
+        table[NK_COLOR_SLIDER] = nk_rgba(46, 48, 85, 255);
+        table[NK_COLOR_SLIDER_CURSOR] = nk_rgba(139, 92, 246, 255);
+        table[NK_COLOR_SLIDER_CURSOR_HOVER] = nk_rgba(167, 139, 250, 255);
+        table[NK_COLOR_SLIDER_CURSOR_ACTIVE] = nk_rgba(124, 58, 237, 255);
+        table[NK_COLOR_PROPERTY] = nk_rgba(22, 24, 45, 255);
+        table[NK_COLOR_EDIT] = nk_rgba(22, 24, 45, 255);
+        table[NK_COLOR_EDIT_CURSOR] = nk_rgba(243, 244, 246, 255);
+        table[NK_COLOR_COMBO] = nk_rgba(22, 24, 45, 255);
+        table[NK_COLOR_CHART] = nk_rgba(22, 24, 45, 255);
+        table[NK_COLOR_CHART_COLOR] = nk_rgba(139, 92, 246, 255);
+        table[NK_COLOR_CHART_COLOR_HIGHLIGHT] = nk_rgba(236, 72, 153, 255);
+        table[NK_COLOR_SCROLLBAR] = nk_rgba(10, 10, 20, 255);
+        table[NK_COLOR_SCROLLBAR_CURSOR] = nk_rgba(46, 48, 85, 255);
+        table[NK_COLOR_SCROLLBAR_CURSOR_HOVER] = nk_rgba(76, 78, 125, 255);
+        table[NK_COLOR_SCROLLBAR_CURSOR_ACTIVE] = nk_rgba(139, 92, 246, 255);
+        table[NK_COLOR_TAB_HEADER] = nk_rgba(22, 24, 45, 255);
+
+        g_theme_text_header = nk_rgb(243, 244, 246);
+        g_theme_text_muted = nk_rgb(156, 163, 175);
+        g_theme_border = nk_rgb(46, 48, 85);
+        g_theme_primary = nk_rgb(139, 92, 246);
+        g_theme_accent = nk_rgb(236, 72, 153);
+    }
+
     nk_style_from_table(ctx, table);
-    
     ctx->style.window.rounding = 8.0f;
     ctx->style.button.rounding = 4.0f;
     ctx->style.edit.rounding = 4.0f;
@@ -708,28 +831,24 @@ static void set_material_light_theme(struct nk_context *ctx) {
     ctx->style.combo.rounding = 4.0f;
     ctx->style.tab.rounding = 4.0f;
     ctx->style.window.header.align = NK_HEADER_LEFT;
+
+    // Persist settings to database
+    char preset_str[16];
+    snprintf(preset_str, sizeof(preset_str), "%d", (int)preset);
+    db_set_setting("theme_preset", preset_str);
+    db_set_setting("theme_mode", g_light_mode ? "light" : "dark");
 }
 
 static void ui_apply_theme(struct nk_context *ctx) {
-    if (g_light_mode) {
-        set_material_light_theme(ctx);
-        g_theme_text_header = nk_rgb(33, 33, 33);
-        g_theme_text_muted = nk_rgb(117, 117, 117);
-        g_theme_border = nk_rgb(224, 224, 224);
-        g_theme_primary = nk_rgb(63, 81, 181);
-        g_theme_accent = nk_rgb(233, 30, 99);
-    } else {
-        set_material_dark_theme(ctx);
-        g_theme_text_header = nk_rgb(255, 255, 255);
-        g_theme_text_muted = nk_rgb(160, 170, 185);
-        g_theme_border = nk_rgb(45, 54, 72);
-        g_theme_primary = nk_rgb(33, 150, 243);
-        g_theme_accent = nk_rgb(255, 64, 129);
-    }
+    apply_theme_preset(ctx, g_theme_preset);
 }
 
 void ui_init(struct nk_context *ctx) {
+    char preset_str[16] = "0";
+    db_get_setting("theme_preset", "0", preset_str, sizeof(preset_str));
+    g_theme_preset = (ThemePreset)atoi(preset_str);
     ui_apply_theme(ctx);
+
     get_today_date(g_attendance_date, sizeof(g_attendance_date));
     load_tab_data(MENU_DASHBOARD);
 }
@@ -2903,12 +3022,12 @@ static void draw_settings_tab(struct nk_context *ctx, int screen_width) {
     nk_label_colored(ctx, ICON_SETTINGS "   PENGATURAN SISTEM & INSTANSI (PRO ENTERPRISE)", NK_TEXT_LEFT, g_theme_text_header);
 
     int cols = screen_width > 900 ? 2 : 1;
-    nk_layout_row_dynamic(ctx, 450, cols);
+    nk_layout_row_dynamic(ctx, 480, cols);
 
     // Section 1: Profil Sekolah / Instansi
     if (nk_group_begin(ctx, "SchoolProfileGroup", NK_WINDOW_BORDER)) {
         nk_layout_row_dynamic(ctx, 25, 1);
-        nk_label_colored(ctx, "PROFIL INSTANSI & KEPALA SEKOLAH", NK_TEXT_LEFT, g_light_mode ? nk_rgb(63, 81, 181) : nk_rgb(30, 136, 229));
+        nk_label_colored(ctx, ICON_STUDENTS "  PROFIL INSTANSI & KEPALA SEKOLAH", NK_TEXT_LEFT, g_theme_primary);
         nk_rule_horizontal(ctx, g_theme_border, 1);
         nk_layout_row_dynamic(ctx, 10, 1);
 
@@ -2954,23 +3073,49 @@ static void draw_settings_tab(struct nk_context *ctx, int screen_width) {
         nk_group_end(ctx);
     }
 
-    // Section 2: Maintenance & Performance Diagnostics
-    if (nk_group_begin(ctx, "MaintenanceGroup", NK_WINDOW_BORDER)) {
+    // Section 2: Pemilihan Tema & Performa Database
+    if (nk_group_begin(ctx, "ThemeAndMaintenanceGroup", NK_WINDOW_BORDER)) {
         nk_layout_row_dynamic(ctx, 25, 1);
-        nk_label_colored(ctx, "PEMELIHARAAN DATABASE & PERFORMA", NK_TEXT_LEFT, g_light_mode ? nk_rgb(63, 81, 181) : nk_rgb(30, 136, 229));
+        nk_label_colored(ctx, ICON_THEME "  PILIH TEMA TAMPILAN (COLOR PALETTES)", NK_TEXT_LEFT, g_theme_primary);
         nk_rule_horizontal(ctx, g_theme_border, 1);
-        nk_layout_row_dynamic(ctx, 10, 1);
+        nk_layout_row_dynamic(ctx, 8, 1);
 
-        nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label(ctx, "Tahun Ajaran Aktif (Default):", NK_TEXT_LEFT);
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label_colored(ctx, "Preset kombinasi warna UI/UX terkalibrasi:", NK_TEXT_LEFT, g_theme_text_muted);
+
         nk_layout_row_dynamic(ctx, 30, 1);
-        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt6, sizeof(g_form_txt6), nk_filter_ascii);
+        if (nk_button_label(ctx, g_theme_preset == THEME_INDIGO_LIGHT ? "[ Indigo Modern (Terang - Active) ]" : "Indigo Modern (Terang)")) {
+            apply_theme_preset(ctx, THEME_INDIGO_LIGHT);
+            show_notification("Tema Indigo Modern (Terang) diterapkan!", true);
+        }
+
+        nk_layout_row_dynamic(ctx, 30, 1);
+        if (nk_button_label(ctx, g_theme_preset == THEME_EMERALD_LIGHT ? "[ Emerald Academic (Terang - Active) ]" : "Emerald Academic (Terang)")) {
+            apply_theme_preset(ctx, THEME_EMERALD_LIGHT);
+            show_notification("Tema Emerald Academic (Terang) diterapkan!", true);
+        }
+
+        nk_layout_row_dynamic(ctx, 30, 1);
+        if (nk_button_label(ctx, g_theme_preset == THEME_AMBER_LIGHT ? "[ Royal Amber (Terang - Active) ]" : "Royal Amber (Terang)")) {
+            apply_theme_preset(ctx, THEME_AMBER_LIGHT);
+            show_notification("Tema Royal Amber (Terang) diterapkan!", true);
+        }
+
+        nk_layout_row_dynamic(ctx, 30, 1);
+        if (nk_button_label(ctx, g_theme_preset == THEME_SLATE_DARK ? "[ Slate Pro (Gelap - Active) ]" : "Slate Pro (Gelap)")) {
+            apply_theme_preset(ctx, THEME_SLATE_DARK);
+            show_notification("Tema Slate Pro (Gelap) diterapkan!", true);
+        }
+
+        nk_layout_row_dynamic(ctx, 30, 1);
+        if (nk_button_label(ctx, g_theme_preset == THEME_CYBER_DARK ? "[ Midnight Cyber (Gelap - Active) ]" : "Midnight Cyber (Gelap)")) {
+            apply_theme_preset(ctx, THEME_CYBER_DARK);
+            show_notification("Tema Midnight Cyber (Gelap) diterapkan!", true);
+        }
 
         nk_layout_row_dynamic(ctx, 15, 1);
         nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label_colored(ctx, "Optimasi & Integritas SQLite:", NK_TEXT_LEFT, g_theme_text_header);
-        nk_layout_row_dynamic(ctx, 20, 1);
-        nk_label_colored(ctx, "Lakukan Vacuum & Reindex untuk mempercepat pencarian data.", NK_TEXT_LEFT, g_theme_text_muted);
+        nk_label_colored(ctx, ICON_BACKUP "  Optimasi & Pemeliharaan Database:", NK_TEXT_LEFT, g_theme_text_header);
 
         nk_layout_row_dynamic(ctx, 35, 1);
         if (nk_button_label(ctx, "⚡ OPTIMASI DATABASE (VACUUM & REINDEX)")) {
@@ -2981,14 +3126,6 @@ static void draw_settings_tab(struct nk_context *ctx, int screen_width) {
             }
         }
 
-        nk_layout_row_dynamic(ctx, 15, 1);
-        nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label_colored(ctx, "Status Buffer & Kapasitas Teks Jurnal:", NK_TEXT_LEFT, g_theme_text_header);
-        nk_layout_row_dynamic(ctx, 20, 1);
-        nk_label(ctx, "✓ Kapasitas Input Jurnal Harian: 65,536 Karakter (64 KB Pro)", NK_TEXT_LEFT);
-        nk_layout_row_dynamic(ctx, 20, 1);
-        nk_label(ctx, "✓ Kapasitas CP/TP Kurikulum: 32,768 Karakter (32 KB)", NK_TEXT_LEFT);
-
         nk_group_end(ctx);
     }
 }
@@ -2998,16 +3135,19 @@ static void draw_about_tab(struct nk_context *ctx, int screen_width) {
     nk_layout_row_dynamic(ctx, 30, 1);
     nk_label_colored(ctx, ICON_ABOUT "   TENTANG SOFTWARE DANGERPCA ERP PRO", NK_TEXT_LEFT, g_theme_text_header);
 
-    nk_layout_row_dynamic(ctx, 130, 1);
+    nk_layout_row_dynamic(ctx, 150, 1);
     if (nk_group_begin(ctx, "AboutBanner", NK_WINDOW_BORDER)) {
         nk_layout_row_dynamic(ctx, 35, 1);
-        nk_label_colored(ctx, "DANGERPCA SCHOOL ERP ENTERPRISE EDITION v2.5 PRO", NK_TEXT_CENTERED, g_light_mode ? nk_rgb(63, 81, 181) : nk_rgb(30, 136, 229));
+        nk_label_colored(ctx, "DANGERPCA SCHOOL ERP ENTERPRISE EDITION v2.5 PRO", NK_TEXT_CENTERED, g_theme_primary);
         
         nk_layout_row_dynamic(ctx, 20, 1);
         nk_label(ctx, "Sistem ERP Sekolah Offline Desktop Berkinerja Tinggi & Manajemen Jurnal Akademik Professional", NK_TEXT_CENTERED);
 
-        nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label_colored(ctx, "STATUS LISENSI: PRO ENTERPRISE UNLIMITED (LIFETIME LICENSE)", NK_TEXT_CENTERED, nk_rgb(39, 174, 96));
+        nk_layout_row_dynamic(ctx, 24, 1);
+        nk_label_colored(ctx, "Pembuat / Author: Hifny Sawyer", NK_TEXT_CENTERED, g_theme_text_header);
+
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label_colored(ctx, "LISENSI: MIT License | STATUS: PRO ENTERPRISE LIFETIME (TERVERIFIKASI)", NK_TEXT_CENTERED, nk_rgb(39, 174, 96));
         nk_group_end(ctx);
     }
 
@@ -3019,36 +3159,36 @@ static void draw_about_tab(struct nk_context *ctx, int screen_width) {
     // Card 1: Spesifikasi & Arsitektur Sistem
     if (nk_group_begin(ctx, "AboutSpecs", NK_WINDOW_BORDER)) {
         nk_layout_row_dynamic(ctx, 25, 1);
-        nk_label_colored(ctx, "INFORMASI LISENSI & SPESIFIKASI SISTEM", NK_TEXT_LEFT, g_theme_text_header);
+        nk_label_colored(ctx, ICON_USERS "  INFORMASI PEMBUAT & SPESIFIKASI", NK_TEXT_LEFT, g_theme_text_header);
         nk_rule_horizontal(ctx, g_theme_border, 1);
         nk_layout_row_dynamic(ctx, 10, 1);
 
         nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label(ctx, "• Versi Aplikasi: v2.5.0 Pro Enterprise", NK_TEXT_LEFT);
-        nk_label(ctx, "• Serial Key: DPCA-ENT-2026-992A-8812-LIFETIME", NK_TEXT_LEFT);
-        nk_label(ctx, "• Engine GUI: Nuklear Immediate Mode (GPU Accelerated)", NK_TEXT_LEFT);
-        nk_label(ctx, "• Backend Graphics: SDL2 Renderer Engine (60 FPS)", NK_TEXT_LEFT);
-        nk_label(ctx, "• Database Engine: SQLite Embedded Engine v3.x", NK_TEXT_LEFT);
-        nk_label(ctx, "• Bahasa Pemrograman: Pure C99 High-Speed Native", NK_TEXT_LEFT);
-        nk_label(ctx, "• Kompatibilitas Platform: Linux (DEB/Binary) & Windows x64", NK_TEXT_LEFT);
+        nk_label(ctx, "   Author / Pembuat: Hifny Sawyer", NK_TEXT_LEFT);
+        nk_label(ctx, "   Lisensi Software: MIT License", NK_TEXT_LEFT);
+        nk_label(ctx, "   Versi Aplikasi: v2.5.0 Pro Enterprise", NK_TEXT_LEFT);
+        nk_label(ctx, "   Engine GUI: Nuklear Immediate Mode (GPU Accelerated)", NK_TEXT_LEFT);
+        nk_label(ctx, "   Backend Graphics: SDL2 Renderer Engine (60 FPS)", NK_TEXT_LEFT);
+        nk_label(ctx, "   Database Engine: SQLite Embedded Engine v3.x", NK_TEXT_LEFT);
+        nk_label(ctx, "   Bahasa Pemrograman: Pure C99 High-Speed Native", NK_TEXT_LEFT);
         nk_group_end(ctx);
     }
 
     // Card 2: Keunggulan & Fitur Unggulan Pro
     if (nk_group_begin(ctx, "AboutFeatures", NK_WINDOW_BORDER)) {
         nk_layout_row_dynamic(ctx, 25, 1);
-        nk_label_colored(ctx, "KEUNGGULAN FITUR ENTERPRISE PRO", NK_TEXT_LEFT, g_theme_text_header);
+        nk_label_colored(ctx, ICON_ACADEMIC "  KEUNGGULAN FITUR ENTERPRISE PRO", NK_TEXT_LEFT, g_theme_text_header);
         nk_rule_horizontal(ctx, g_theme_border, 1);
         nk_layout_row_dynamic(ctx, 10, 1);
 
         nk_layout_row_dynamic(ctx, 22, 1);
-        nk_label(ctx, "✓ Jurnal Pembelajaran Tanpa Batas (Text Buffer up to 64 KB)", NK_TEXT_LEFT);
-        nk_label(ctx, "✓ Editor Rich Text WYSIWYG & Visual Live Preview Sync", NK_TEXT_LEFT);
-        nk_label(ctx, "✓ Manajemen Kurikulum Merdeka (CP, TP & ATP)", NK_TEXT_LEFT);
-        nk_label(ctx, "✓ Pencatatan Absensi Harian & Nilai Transkrip Rapor", NK_TEXT_LEFT);
-        nk_label(ctx, "✓ Generator Laporan Otomatis Ekspor PDF & Excel CSV", NK_TEXT_LEFT);
-        nk_label(ctx, "✓ Keamanan Data 100% Offline Tanpa Ketergantungan Internet", NK_TEXT_LEFT);
-        nk_label(ctx, "✓ Backup & Restore Instant Sekali Klik", NK_TEXT_LEFT);
+        nk_label(ctx, "   " ICON_RTE_CHECK "   Jurnal Pembelajaran Tanpa Batas (Text Buffer up to 64 KB)", NK_TEXT_LEFT);
+        nk_label(ctx, "   " ICON_RTE_CHECK "   Editor Rich Text WYSIWYG & Visual Live Preview Sync", NK_TEXT_LEFT);
+        nk_label(ctx, "   " ICON_RTE_CHECK "   Manajemen Kurikulum Merdeka (CP, TP & ATP)", NK_TEXT_LEFT);
+        nk_label(ctx, "   " ICON_RTE_CHECK "   Pencatatan Absensi Harian & Nilai Transkrip Rapor", NK_TEXT_LEFT);
+        nk_label(ctx, "   " ICON_RTE_CHECK "   Generator Laporan Otomatis Ekspor PDF & Excel CSV", NK_TEXT_LEFT);
+        nk_label(ctx, "   " ICON_RTE_CHECK "   Keamanan Data 100% Offline Tanpa Ketergantungan Internet", NK_TEXT_LEFT);
+        nk_label(ctx, "   " ICON_RTE_CHECK "   Backup & Restore Instant Sekali Klik", NK_TEXT_LEFT);
         nk_group_end(ctx);
     }
 }
