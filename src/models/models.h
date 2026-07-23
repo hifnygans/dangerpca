@@ -24,7 +24,7 @@ typedef enum {
     EXAM_UAS
 } ExamType;
 
-// Model Structs with fixed-size buffers for simpler C memory management
+// Model Structs with super-expanded buffers for professional long-form journaling
 typedef struct {
     int id;
     char username[50];
@@ -35,98 +35,109 @@ typedef struct {
 
 typedef struct {
     int id;
-    char nisn[20];
-    char name[100];
+    char nisn[50];
+    char name[150];
     int class_id;
     char class_name[50]; // helper for displaying
     char gender[10]; // "L" or "P"
     char dob[20]; // YYYY-MM-DD
-    char address[200];
-    char status[20]; // "Aktif", "Lulus", "Keluar"
+    char address[4096];
+    char status[50]; // "Aktif", "Lulus", "Keluar"
 } Student;
 
 typedef struct {
     int id;
-    char nip[30];
-    char name[100];
+    char nip[50];
+    char name[150];
     char gender[10]; // "L" or "P"
     char subject[100];
-    char phone[20];
-    char status[20]; // "Aktif", "Cuti", "Pensiun"
+    char phone[50];
+    char status[50]; // "Aktif", "Cuti", "Pensiun"
 } Teacher;
 
 typedef struct {
     int id;
     char name[50];
-    char academic_year[20]; // e.g. 2025/2026
+    char academic_year[50]; // e.g. 2025/2026
     int teacher_id;
-    char teacher_name[100]; // helper
+    char teacher_name[150]; // helper
 } ClassEntity;
 
 typedef struct {
     int id;
     int student_id;
-    char student_name[100]; // helper
+    char student_name[150]; // helper
     char class_name[50]; // helper
     char date[20]; // YYYY-MM-DD
     AttendanceStatus status;
-    char notes[100];
+    char notes[4096];
 } Attendance;
 
 typedef struct {
     int id;
-    char code[20]; // e.g. CP-001
-    char description[2048];
+    char code[50]; // e.g. CP-001
+    char description[32768]; // 32 KB capacity
     char subject[100];
 } CapaianPembelajaran;
 
 typedef struct {
     int id;
     int cp_id;
-    char cp_code[20]; // helper
-    char code[20]; // e.g. TP-001
-    char description[2048];
+    char cp_code[50]; // helper
+    char code[50]; // e.g. TP-001
+    char description[32768]; // 32 KB capacity
 } TujuanPembelajaran;
 
 typedef struct {
     int id;
     int tp_id;
-    char tp_code[20]; // helper
+    char tp_code[50]; // helper
     int order_num;
-    char description[2048];
+    char description[32768]; // 32 KB capacity
 } AlurTujuanPembelajaran;
 
 typedef struct {
     int id;
     int teacher_id;
-    char teacher_name[100]; // helper
+    char teacher_name[150]; // helper
     int class_id;
     char class_name[50]; // helper
     char date[20]; // YYYY-MM-DD
-    char activity[2048];
-    char notes[2048];
+    char activity[65536]; // 64 KB capacity for rich long journals
+    char notes[65536]; // 64 KB capacity for notes & evaluations
 } DailyJournal;
 
 typedef struct {
     int id;
     int student_id;
-    char student_name[100]; // helper
+    char student_name[150]; // helper
     int tp_id;
-    char tp_code[20]; // helper
+    char tp_code[50]; // helper
     double score;
     char date[20]; // YYYY-MM-DD
-    char notes[100];
+    char notes[4096];
 } DailyGrade;
 
 typedef struct {
     int id;
     int student_id;
-    char student_name[100]; // helper
+    char student_name[150]; // helper
     char subject[100];
     ExamType exam_type;
     double score;
     char date[20]; // YYYY-MM-DD
 } ExamGrade;
+
+// Key-Value Settings Struct
+typedef struct {
+    char school_name[150];
+    char school_npsn[50];
+    char school_address[256];
+    char principal_name[150];
+    char principal_nip[50];
+    char academic_year[50];
+    char semester[20];
+} SchoolSettings;
 
 // Dashboard Summary Struct
 typedef struct {

@@ -78,4 +78,10 @@ bool db_delete_exam_grade(int id);
 // Dashboard Statistics
 bool db_get_dashboard_stats(DashboardStats *out_stats);
 
+// Settings Persistence
+bool db_get_setting(const char *key, const char *default_val, char *out_val, int max_len);
+bool db_set_setting(const char *key, const char *val);
+bool db_get_school_settings(SchoolSettings *out_settings);
+bool db_save_school_settings(const SchoolSettings *settings);
+
 #endif // DB_H

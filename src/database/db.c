@@ -177,6 +177,14 @@ bool db_init(const char *db_path) {
         ");"
     );
 
+    // Settings Table for System & School Configuration
+    db_execute(
+        "CREATE TABLE IF NOT EXISTS settings ("
+        "key TEXT PRIMARY KEY,"
+        "value TEXT NOT NULL"
+        ");"
+    );
+
     db_execute("COMMIT;");
 
     // Insert Default Admin if not exists
@@ -1060,5 +1068,72 @@ bool db_get_dashboard_stats(DashboardStats *out_stats) {
         sqlite3_finalize(stmt);
     }
 
+    return true;
+}
+
+// Settings Persistence Functions
+bool db_get_setting(const char *key, const char *default_val, char *out_val, int max_len) {
+    if (!g_db || !key || !out_val || max_len <= 0) return false;
+    
+    // Set default value first
+    if (default_val) {
+        strncpy(out_val, default_val, max_len - 1);
+        out_val[max_len - 1] = '\0';
+    } else {
+        out_val[0] = '\0';
+    }
+
+    sqlite3_stmt *stmt;
+    const char *sql = "SELECT value FROM settings WHERE key = ?";
+    if (sqlite3_prepare_v2(g_db, sql, -1, &stmt, NULL) != SQLITE_OK) return false;
+    
+    sqlite3_bind_text(stmt, 1, key, -1, SQLITE_TRANSIENT);
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char *val = (const char *)sqlite3_column_text(stmt, 0);
+        if (val) {
+            strncpy(out_val, val, max_len - 1);
+            out_val[max_len - 1] = '\0';
+        }
+    }
+    sqlite3_finalize(stmt);
+    return true;
+}
+
+bool db_set_setting(const char *key, const char *val) {
+    if (!g_db || !key || !val) return false;
+    
+    sqlite3_stmt *stmt;
+    const char *sql = "INSERT INTO settings (key, value) VALUES (?, ?) "
+                      "ON CONFLICT(key) DO UPDATE SET value = excluded.value";
+    if (sqlite3_prepare_v2(g_db, sql, -1, &stmt, NULL) != SQLITE_OK) return false;
+    
+    sqlite3_bind_text(stmt, 1, key, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, val, -1, SQLITE_TRANSIENT);
+    bool success = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return success;
+}
+
+bool db_get_school_settings(SchoolSettings *out_settings) {
+    if (!out_settings) return false;
+    db_get_setting("school_name", "SMA Negeri 1 Enterprise", out_settings->school_name, sizeof(out_settings->school_name));
+    db_get_setting("school_npsn", "20199482", out_settings->school_npsn, sizeof(out_settings->school_npsn));
+    db_get_setting("school_address", "Jl. Edukasi Utama No. 45, Jakarta Pusat", out_settings->school_address, sizeof(out_settings->school_address));
+    db_get_setting("principal_name", "Dr. H. Ahmad Fauzi, M.Pd.", out_settings->principal_name, sizeof(out_settings->principal_name));
+    db_get_setting("principal_nip", "19780512 200312 1 002", out_settings->principal_nip, sizeof(out_settings->principal_nip));
+    db_get_setting("academic_year", "2025/2026", out_settings->academic_year, sizeof(out_settings->academic_year));
+    db_get_setting("semester", "Ganjil", out_settings->semester, sizeof(out_settings->semester));
+    return true;
+}
+
+bool db_save_school_settings(const SchoolSettings *settings) {
+    if (!settings) return false;
+    db_set_setting("school_name", settings->school_name);
+    db_set_setting("school_npsn", settings->school_npsn);
+    db_set_setting("school_address", settings->school_address);
+    db_set_setting("principal_name", settings->principal_name);
+    db_set_setting("principal_nip", settings->principal_nip);
+    db_set_setting("academic_year", settings->academic_year);
+    db_set_setting("semester", settings->semester);
     return true;
 }

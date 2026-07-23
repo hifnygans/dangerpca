@@ -13,7 +13,9 @@ typedef enum {
     MENU_JOURNAL,
     MENU_GRADES,
     MENU_USERS,
-    MENU_BACKUP
+    MENU_BACKUP,
+    MENU_SETTINGS,
+    MENU_ABOUT
 } SidebarMenu;
 
 // Initialize UI state

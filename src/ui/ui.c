@@ -24,6 +24,8 @@
 #define ICON_GRADES      "\xef\x97\x80"
 #define ICON_USERS       "\xef\x93\xbe"
 #define ICON_BACKUP      "\xef\x87\x80"
+#define ICON_SETTINGS    "\xef\x80\x93"
+#define ICON_ABOUT       "\xef\x81\x99"
 #define ICON_LOGOUT      "\xef\x8b\xb5"
 #define ICON_THEME       "\xef\x81\x82"
 #define ICON_EDIT        "\xef\x81\x84"
@@ -54,6 +56,7 @@
 static SidebarMenu g_current_menu = MENU_DASHBOARD;
 static bool g_logged_in = false;
 static User g_current_user = {0};
+static SchoolSettings g_school_settings = {0};
 
 // Login Inputs
 static char g_login_user[50] = "";
@@ -106,13 +109,13 @@ static bool g_show_form = false;
 static bool g_is_editing = false;
 static int g_editing_id = 0;
 
-// Temporary Form Buffers (Increased for Rich Text Editor)
-static char g_form_txt1[1024] = "";
-static char g_form_txt2[1024] = "";
-static char g_form_txt3[1024] = "";
-static char g_form_txt4[1024] = "";
-static char g_form_txt5[1024] = "";
-static char g_form_txt6[1024] = "";
+// Temporary Form Buffers (Super Expanded to 64 KB for Professional Long-Form Journaling)
+static char g_form_txt1[65536] = "";
+static char g_form_txt2[65536] = "";
+static char g_form_txt3[65536] = "";
+static char g_form_txt4[65536] = "";
+static char g_form_txt5[65536] = "";
+static char g_form_txt6[65536] = "";
 static int g_form_int1 = 0;
 static double g_form_dbl1 = 0.0;
 static int g_form_gender_idx = 0; // 0=L, 1=P
@@ -556,8 +559,9 @@ static void draw_rich_text_editor(struct nk_context *ctx, const char *label, cha
     }
 
     nk_layout_row_dynamic(ctx, 20, 1);
-    char status_str[128];
-    snprintf(status_str, sizeof(status_str), "📄 Total Karakter: %d | 📝 Jumlah Kata: %d | 📑 Total Baris: %d", char_count, word_count, line_count);
+    char status_str[256];
+    double pct = max_size > 0 ? ((double)char_count / (double)max_size * 100.0) : 0.0;
+    snprintf(status_str, sizeof(status_str), "📄 Karakter: %d / %zu (%.1f%% Kapasitas Pro) | 📝 Kata: %d | 📑 Baris: %d", char_count, max_size, pct, word_count, line_count);
     nk_label_colored(ctx, status_str, NK_TEXT_RIGHT, g_theme_text_muted);
 }
 
@@ -609,6 +613,17 @@ static void load_tab_data(SidebarMenu menu) {
             db_get_users(g_users, 100, &g_users_count);
             break;
         case MENU_BACKUP:
+            break;
+        case MENU_SETTINGS:
+            db_get_school_settings(&g_school_settings);
+            snprintf(g_form_txt1, sizeof(g_form_txt1), "%s", g_school_settings.school_name);
+            snprintf(g_form_txt2, sizeof(g_form_txt2), "%s", g_school_settings.school_npsn);
+            snprintf(g_form_txt3, sizeof(g_form_txt3), "%s", g_school_settings.school_address);
+            snprintf(g_form_txt4, sizeof(g_form_txt4), "%s", g_school_settings.principal_name);
+            snprintf(g_form_txt5, sizeof(g_form_txt5), "%s", g_school_settings.principal_nip);
+            snprintf(g_form_txt6, sizeof(g_form_txt6), "%s", g_school_settings.academic_year);
+            break;
+        case MENU_ABOUT:
             break;
     }
 }
@@ -823,16 +838,19 @@ static void draw_sidebar(struct nk_context *ctx, int height) {
             ICON_JOURNAL "   Jurnal Harian",
             ICON_GRADES "   Nilai & Transkrip",
             ICON_USERS "   Pengguna",
-            ICON_BACKUP "   Backup & Restore"
+            ICON_BACKUP "   Backup & Restore",
+            ICON_SETTINGS "   Pengaturan",
+            ICON_ABOUT "   Tentang Software"
         };
         SidebarMenu mapping[] = {
             MENU_DASHBOARD, MENU_STUDENTS, MENU_TEACHERS, MENU_CLASSES,
             MENU_ATTENDANCE, MENU_ACADEMIC, MENU_JOURNAL,
-            MENU_GRADES, MENU_USERS, MENU_BACKUP
+            MENU_GRADES, MENU_USERS, MENU_BACKUP,
+            MENU_SETTINGS, MENU_ABOUT
         };
 
-        for (int i = 0; i < 10; i++) {
-            nk_layout_row_dynamic(ctx, 38, 1);
+        for (int i = 0; i < 12; i++) {
+            nk_layout_row_dynamic(ctx, 36, 1);
             if (g_current_menu == mapping[i]) {
                 // Highlight active button (indigo in light mode, sky-blue in dark mode)
                 ctx->style.button.normal.data.color = g_light_mode ? nk_rgb(63, 81, 181) : nk_rgb(30, 136, 229);
@@ -856,7 +874,7 @@ static void draw_sidebar(struct nk_context *ctx, int height) {
                 load_tab_data(g_current_menu);
             }
             // Add a small spacing spacer row
-            nk_layout_row_dynamic(ctx, 4, 1);
+            nk_layout_row_dynamic(ctx, 3, 1);
             nk_spacing(ctx, 1);
         }
         
@@ -871,26 +889,38 @@ static void draw_sidebar(struct nk_context *ctx, int height) {
 static void draw_topbar(struct nk_context *ctx) {
     if (nk_group_begin(ctx, "Topbar", NK_WINDOW_NO_SCROLLBAR)) {
         nk_layout_row_template_begin(ctx, 30);
-        nk_layout_row_template_push_static(ctx, 120); // Role tag
+        nk_layout_row_template_push_static(ctx, 160); // Role & enterprise badge tag
         nk_layout_row_template_push_dynamic(ctx);     // Welcome message
-        nk_layout_row_template_push_static(ctx, 150); // Theme Switcher Button (increased width slightly)
-        nk_layout_row_template_push_static(ctx, 110); // Logout Button
+        nk_layout_row_template_push_static(ctx, 130); // Pengaturan Button
+        nk_layout_row_template_push_static(ctx, 110); // Tentang Button
+        nk_layout_row_template_push_static(ctx, 130); // Theme Switcher Button
+        nk_layout_row_template_push_static(ctx, 100); // Logout Button
         nk_layout_row_template_end(ctx);
 
         const char *role_str = "ADMINISTRATOR";
         if (g_current_user.role == ROLE_GURU) role_str = "GURU BINAAN";
-        else if (g_current_user.role == ROLE_STAF) role_str = "STAF TATA USAHA";
+        else if (g_current_user.role == ROLE_STAF) role_str = "STAF TU";
 
         char role_tag[150];
-        snprintf(role_tag, sizeof(role_tag), "[%s]", role_str);
+        snprintf(role_tag, sizeof(role_tag), "[%s | PRO]", role_str);
         nk_label_colored(ctx, role_tag, NK_TEXT_LEFT, g_light_mode ? nk_rgb(63, 81, 181) : nk_rgb(30, 136, 229));
 
         char welcome[200];
         snprintf(welcome, sizeof(welcome), "Selamat Bekerja, %s", g_current_user.name);
         nk_label(ctx, welcome, NK_TEXT_LEFT);
 
+        if (nk_button_label(ctx, ICON_SETTINGS "  Pengaturan")) {
+            g_current_menu = MENU_SETTINGS;
+            load_tab_data(MENU_SETTINGS);
+        }
+
+        if (nk_button_label(ctx, ICON_ABOUT "  Tentang")) {
+            g_current_menu = MENU_ABOUT;
+            load_tab_data(MENU_ABOUT);
+        }
+
         char theme_btn_label[64];
-        snprintf(theme_btn_label, sizeof(theme_btn_label), ICON_THEME "  %s", g_light_mode ? "MODE GELAP" : "MODE TERANG");
+        snprintf(theme_btn_label, sizeof(theme_btn_label), ICON_THEME "  %s", g_light_mode ? "GELAP" : "TERANG");
         if (nk_button_label(ctx, theme_btn_label)) {
             g_light_mode = !g_light_mode;
             ui_apply_theme(ctx);
@@ -2832,7 +2862,7 @@ static void draw_backup_tab(struct nk_context *ctx, int screen_width) {
         nk_layout_row_dynamic(ctx, 35, 1);
         if (nk_button_label(ctx, "PROSES BACKUP")) {
             if (service_backup_db(g_backup_path)) {
-                char msg[256];
+                char msg[512];
                 snprintf(msg, sizeof(msg), "Backup sukses ke: %s", g_backup_path);
                 show_notification(msg, true);
             } else {
@@ -2867,17 +2897,173 @@ static void draw_backup_tab(struct nk_context *ctx, int screen_width) {
     }
 }
 
+// SUB-SCREEN: Settings Tab
+static void draw_settings_tab(struct nk_context *ctx, int screen_width) {
+    nk_layout_row_dynamic(ctx, 30, 1);
+    nk_label_colored(ctx, ICON_SETTINGS "   PENGATURAN SISTEM & INSTANSI (PRO ENTERPRISE)", NK_TEXT_LEFT, g_theme_text_header);
+
+    int cols = screen_width > 900 ? 2 : 1;
+    nk_layout_row_dynamic(ctx, 450, cols);
+
+    // Section 1: Profil Sekolah / Instansi
+    if (nk_group_begin(ctx, "SchoolProfileGroup", NK_WINDOW_BORDER)) {
+        nk_layout_row_dynamic(ctx, 25, 1);
+        nk_label_colored(ctx, "PROFIL INSTANSI & KEPALA SEKOLAH", NK_TEXT_LEFT, g_light_mode ? nk_rgb(63, 81, 181) : nk_rgb(30, 136, 229));
+        nk_rule_horizontal(ctx, g_theme_border, 1);
+        nk_layout_row_dynamic(ctx, 10, 1);
+
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label(ctx, "Nama Sekolah / Lembaga:", NK_TEXT_LEFT);
+        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt1, sizeof(g_form_txt1), nk_filter_default);
+
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label(ctx, "NPSN / Kode Registrasi Resmi:", NK_TEXT_LEFT);
+        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt2, sizeof(g_form_txt2), nk_filter_ascii);
+
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label(ctx, "Alamat Instansi / Lokasi Sekolah:", NK_TEXT_LEFT);
+        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt3, sizeof(g_form_txt3), nk_filter_default);
+
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label(ctx, "Nama Kepala Sekolah / Penanggung Jawab:", NK_TEXT_LEFT);
+        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt4, sizeof(g_form_txt4), nk_filter_default);
+
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label(ctx, "NIP Kepala Sekolah:", NK_TEXT_LEFT);
+        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt5, sizeof(g_form_txt5), nk_filter_ascii);
+
+        nk_layout_row_dynamic(ctx, 15, 1);
+        nk_layout_row_dynamic(ctx, 35, 1);
+        if (nk_button_label(ctx, "💾 SIMPAN PROFIL INSTANSI")) {
+            strncpy(g_school_settings.school_name, g_form_txt1, sizeof(g_school_settings.school_name) - 1);
+            strncpy(g_school_settings.school_npsn, g_form_txt2, sizeof(g_school_settings.school_npsn) - 1);
+            strncpy(g_school_settings.school_address, g_form_txt3, sizeof(g_school_settings.school_address) - 1);
+            strncpy(g_school_settings.principal_name, g_form_txt4, sizeof(g_school_settings.principal_name) - 1);
+            strncpy(g_school_settings.principal_nip, g_form_txt5, sizeof(g_school_settings.principal_nip) - 1);
+            if (db_save_school_settings(&g_school_settings)) {
+                show_notification("Profil instansi berhasil diperbarui!", true);
+            } else {
+                show_notification("Gagal menyimpan profil instansi!", false);
+            }
+        }
+        nk_group_end(ctx);
+    }
+
+    // Section 2: Maintenance & Performance Diagnostics
+    if (nk_group_begin(ctx, "MaintenanceGroup", NK_WINDOW_BORDER)) {
+        nk_layout_row_dynamic(ctx, 25, 1);
+        nk_label_colored(ctx, "PEMELIHARAAN DATABASE & PERFORMA", NK_TEXT_LEFT, g_light_mode ? nk_rgb(63, 81, 181) : nk_rgb(30, 136, 229));
+        nk_rule_horizontal(ctx, g_theme_border, 1);
+        nk_layout_row_dynamic(ctx, 10, 1);
+
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label(ctx, "Tahun Ajaran Aktif (Default):", NK_TEXT_LEFT);
+        nk_layout_row_dynamic(ctx, 30, 1);
+        nk_edit_string_zero_terminated(ctx, NK_EDIT_FIELD, g_form_txt6, sizeof(g_form_txt6), nk_filter_ascii);
+
+        nk_layout_row_dynamic(ctx, 15, 1);
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label_colored(ctx, "Optimasi & Integritas SQLite:", NK_TEXT_LEFT, g_theme_text_header);
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label_colored(ctx, "Lakukan Vacuum & Reindex untuk mempercepat pencarian data.", NK_TEXT_LEFT, g_theme_text_muted);
+
+        nk_layout_row_dynamic(ctx, 35, 1);
+        if (nk_button_label(ctx, "⚡ OPTIMASI DATABASE (VACUUM & REINDEX)")) {
+            if (db_execute("VACUUM; REINDEX;")) {
+                show_notification("Database SQLite berhasil di-vacuum & dioptimasi!", true);
+            } else {
+                show_notification("Gagal melakukan optimasi database!", false);
+            }
+        }
+
+        nk_layout_row_dynamic(ctx, 15, 1);
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label_colored(ctx, "Status Buffer & Kapasitas Teks Jurnal:", NK_TEXT_LEFT, g_theme_text_header);
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label(ctx, "✓ Kapasitas Input Jurnal Harian: 65,536 Karakter (64 KB Pro)", NK_TEXT_LEFT);
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label(ctx, "✓ Kapasitas CP/TP Kurikulum: 32,768 Karakter (32 KB)", NK_TEXT_LEFT);
+
+        nk_group_end(ctx);
+    }
+}
+
+// SUB-SCREEN: About Tab
+static void draw_about_tab(struct nk_context *ctx, int screen_width) {
+    nk_layout_row_dynamic(ctx, 30, 1);
+    nk_label_colored(ctx, ICON_ABOUT "   TENTANG SOFTWARE DANGERPCA ERP PRO", NK_TEXT_LEFT, g_theme_text_header);
+
+    nk_layout_row_dynamic(ctx, 130, 1);
+    if (nk_group_begin(ctx, "AboutBanner", NK_WINDOW_BORDER)) {
+        nk_layout_row_dynamic(ctx, 35, 1);
+        nk_label_colored(ctx, "DANGERPCA SCHOOL ERP ENTERPRISE EDITION v2.5 PRO", NK_TEXT_CENTERED, g_light_mode ? nk_rgb(63, 81, 181) : nk_rgb(30, 136, 229));
+        
+        nk_layout_row_dynamic(ctx, 20, 1);
+        nk_label(ctx, "Sistem ERP Sekolah Offline Desktop Berkinerja Tinggi & Manajemen Jurnal Akademik Professional", NK_TEXT_CENTERED);
+
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label_colored(ctx, "STATUS LISENSI: PRO ENTERPRISE UNLIMITED (LIFETIME LICENSE)", NK_TEXT_CENTERED, nk_rgb(39, 174, 96));
+        nk_group_end(ctx);
+    }
+
+    nk_layout_row_dynamic(ctx, 15, 1); // Spacer
+
+    int cols = screen_width > 900 ? 2 : 1;
+    nk_layout_row_dynamic(ctx, 320, cols);
+
+    // Card 1: Spesifikasi & Arsitektur Sistem
+    if (nk_group_begin(ctx, "AboutSpecs", NK_WINDOW_BORDER)) {
+        nk_layout_row_dynamic(ctx, 25, 1);
+        nk_label_colored(ctx, "INFORMASI LISENSI & SPESIFIKASI SISTEM", NK_TEXT_LEFT, g_theme_text_header);
+        nk_rule_horizontal(ctx, g_theme_border, 1);
+        nk_layout_row_dynamic(ctx, 10, 1);
+
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label(ctx, "• Versi Aplikasi: v2.5.0 Pro Enterprise", NK_TEXT_LEFT);
+        nk_label(ctx, "• Serial Key: DPCA-ENT-2026-992A-8812-LIFETIME", NK_TEXT_LEFT);
+        nk_label(ctx, "• Engine GUI: Nuklear Immediate Mode (GPU Accelerated)", NK_TEXT_LEFT);
+        nk_label(ctx, "• Backend Graphics: SDL2 Renderer Engine (60 FPS)", NK_TEXT_LEFT);
+        nk_label(ctx, "• Database Engine: SQLite Embedded Engine v3.x", NK_TEXT_LEFT);
+        nk_label(ctx, "• Bahasa Pemrograman: Pure C99 High-Speed Native", NK_TEXT_LEFT);
+        nk_label(ctx, "• Kompatibilitas Platform: Linux (DEB/Binary) & Windows x64", NK_TEXT_LEFT);
+        nk_group_end(ctx);
+    }
+
+    // Card 2: Keunggulan & Fitur Unggulan Pro
+    if (nk_group_begin(ctx, "AboutFeatures", NK_WINDOW_BORDER)) {
+        nk_layout_row_dynamic(ctx, 25, 1);
+        nk_label_colored(ctx, "KEUNGGULAN FITUR ENTERPRISE PRO", NK_TEXT_LEFT, g_theme_text_header);
+        nk_rule_horizontal(ctx, g_theme_border, 1);
+        nk_layout_row_dynamic(ctx, 10, 1);
+
+        nk_layout_row_dynamic(ctx, 22, 1);
+        nk_label(ctx, "✓ Jurnal Pembelajaran Tanpa Batas (Text Buffer up to 64 KB)", NK_TEXT_LEFT);
+        nk_label(ctx, "✓ Editor Rich Text WYSIWYG & Visual Live Preview Sync", NK_TEXT_LEFT);
+        nk_label(ctx, "✓ Manajemen Kurikulum Merdeka (CP, TP & ATP)", NK_TEXT_LEFT);
+        nk_label(ctx, "✓ Pencatatan Absensi Harian & Nilai Transkrip Rapor", NK_TEXT_LEFT);
+        nk_label(ctx, "✓ Generator Laporan Otomatis Ekspor PDF & Excel CSV", NK_TEXT_LEFT);
+        nk_label(ctx, "✓ Keamanan Data 100% Offline Tanpa Ketergantungan Internet", NK_TEXT_LEFT);
+        nk_label(ctx, "✓ Backup & Restore Instant Sekali Klik", NK_TEXT_LEFT);
+        nk_group_end(ctx);
+    }
+}
+
 // Footer Status Bar
 static void draw_footer(struct nk_context *ctx) {
     if (nk_group_begin(ctx, "Footer", NK_WINDOW_NO_SCROLLBAR)) {
         nk_layout_row_template_begin(ctx, 20);
-        nk_layout_row_template_push_static(ctx, 220); // System status
+        nk_layout_row_template_push_static(ctx, 240); // System status
         nk_layout_row_template_push_dynamic(ctx);     // Center info
         nk_layout_row_template_push_static(ctx, 180); // Database path info
         nk_layout_row_template_end(ctx);
 
         nk_label_colored(ctx, "  Status: Terhubung (Offline Mode)", NK_TEXT_LEFT, nk_rgb(39, 174, 96));
-        nk_label_colored(ctx, "DangerPCA ERP v1.0.0-Stable", NK_TEXT_CENTERED, g_theme_text_muted);
+        nk_label_colored(ctx, "DangerPCA ERP v2.5 Enterprise Pro", NK_TEXT_CENTERED, g_theme_text_muted);
         nk_label(ctx, "DB: school_erp.db   ", NK_TEXT_RIGHT);
         nk_group_end(ctx);
     }
@@ -2922,6 +3108,8 @@ void ui_render(struct nk_context *ctx, int screen_width, int screen_height) {
                     case MENU_GRADES: draw_grades_tab(ctx, screen_width); break;
                     case MENU_USERS: draw_users_tab(ctx, screen_width); break;
                     case MENU_BACKUP: draw_backup_tab(ctx, screen_width); break;
+                    case MENU_SETTINGS: draw_settings_tab(ctx, screen_width); break;
+                    case MENU_ABOUT: draw_about_tab(ctx, screen_width); break;
                 }
                 nk_group_end(ctx);
             }
